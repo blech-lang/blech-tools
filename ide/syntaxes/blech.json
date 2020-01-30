@@ -1,0 +1,228 @@
+{
+    "comment": "Docs in https://manual.macromates.com/en/language_grammars and https://www.sublimetext.com/docs/3/scope_naming.html",
+
+    "fileTypes": [
+        "blc", "blh"
+    ],
+  
+    "firstLineMatch": "^#!\\s*/.*\\bblech",
+  
+    "name": "Blech",
+  
+    "patterns": [
+        {
+            "name": "support.class.blech",
+            "match": "\\b(module|signature|import|as|exposes)\\b"      
+        },  
+        {"include": "#path-usage"},
+        {"include": "#definition-keyword"},
+        {"include": "#clockdefinition-keyword"},
+        {"include": "#definition"},
+        {"include": "#declaration"},
+        {"include": "#control"},
+        {"include": "#control-keyword"},
+        {"include": "#yada-yada"},
+        {"include": "#expression"},
+        {"include": "#attribute"},
+        {"include": "#pragma"},
+        {"include": "#comment"}
+    ],
+    
+    "repository": {
+        "path-usage": {
+            "name": "meta.definition.blech",
+            "match": "\\b(from)[\\s]*(<[^[>\\./\\\\]][^>\\\\]*>)",
+            "captures": {
+                "1": {"name": "support.class.blech"},
+                "2": {"name": "string.quoted.other"}  
+            }
+        },
+        "comment": {
+            "name": "comment.blech",
+            "patterns": [
+                {"include": "#comment-block-doc"},
+                {"include": "#comment-block"},
+                {"include": "#comment-line-doc"},
+                {"include": "#comment-line"}
+            ]
+        },
+        "comment-block": {
+            "name": "comment.block.blech",
+            "begin": "/\\*",
+            "end": "\\*/",
+            "patterns": [
+                {"include": "#comment-block-doc"},
+                {"include": "#comment-block"}
+            ]
+        },
+        "comment-block-doc": {
+            "name": "comment.block.documentation.blech",
+            "begin": "/\\*\\*",
+            "end": "\\*/"
+        },
+        "comment-line": {
+            "name": "comment.line.blech",
+            "match": "(//).*$\\n?"
+        },
+        "comment-line-doc": {
+            "name": "comment.line.documentation.blech",
+            "match": "(///).*$\\n?"
+        },
+        "attribute": {
+            "name": "string.attribute.blech",
+            "begin": "@\\[",
+            "end": "\\]",
+            "patterns": [
+                {"include": "#double-quoted-string"}
+            ]        
+        },
+        "pragma": {
+            "name": "string.attribute.blech",
+            "begin": "@@\\[",
+            "end": "\\]",
+            "patterns": [
+                {"include": "#double-quoted-string"}
+            ]        
+        },        
+        "clockdefinition-keyword": {
+            "name": "support.function.blech",
+            "match": "\\b(clock|up|down|join|meet|off)\\b"
+        },
+
+        "definition": {
+            "name": "meta.definition.blech",
+            "begin": "\\b(function|activity|unit|struct|enum|type|newtype|extension|interface)\\b",
+            "end": "\\b(end)\\b",
+            "beginCaptures": {
+                "1": {"name": "storage.type.blech"}
+            },
+            "endCaptures": {
+                "1": {"name": "storage.type.blech"}
+            },
+            "patterns": [
+                {"include": "#definition-keyword"},
+                {"include": "#accesscontrol-keyword"},
+                {"include": "#declaration"},
+                {"include": "#control"},
+                {"include": "#control-keyword"},
+                {"include": "#yada-yada"},
+                {"include": "#clock-keyword"},
+                {"include": "#comment"},
+                {"include": "#definition"}
+            ]
+        },
+        "definition-keyword": {
+            "name": "storage.type.blech",
+            "match": "\\b(ref|singleton|returns|throws|default|shares)\\b"
+        },
+        
+        "declaration": {
+            "name": "meta.declaration.blech",
+            "patterns": [
+                {"include": "#attribute"},
+                {"include": "#pragma"},
+                {"include": "#declaration-keyword"},
+                {"include": "#expression"}
+            ]
+        },
+        "declaration-keyword": {
+            "name": "storage.type.blech",
+            "match": "\\b(bool|bits8|bits16|bits32|bits64|uint8|uint16|uint32|uint64|int8|int16|int32|int64|float32|float64|signal|var|let|param|const|ref|extern|extension)\\b"            
+        },
+        
+        "control": {
+            "name": "meta.control-flow.blech",
+            "begin": "\\b(repeat|if|cobegin|do|abort|reset|suspend|try|defer)\\b",
+            "end": "\\b(end)\\b",
+            "beginCaptures": {
+                "1": {"name": "keyword.control.blech"}
+            },
+            "endCaptures": {
+                "1": {"name": "keyword.control.blech"}
+            },
+            "patterns": [
+                {"include": "#control-keyword"},
+                {"include": "#yada-yada"},
+                {"include": "#clock-keyword"},
+                {"include": "#expression"},
+                {"include": "#declaration"},
+                {"include": "#comment"},
+                {"include": "#control"}
+            ]    
+        },
+        "control-keyword": {
+            "name": "keyword.control.blech",
+            "match": "\\b(while|until|for|in|of|then|elseif|else|return|await|emit|run|when|with|weak|assert|assume|throw)\\b"
+        },
+        "yada-yada":{
+            "name": "keyword.control.blech",
+            "match": "(\\.\\.\\.)"
+        },
+        "clock-keyword": {
+            "name": "support.function.blech",
+            "match": "\\b(on)\\b"
+        },
+        "expression": {
+            "name": "meta.expression.blech",
+            "patterns": [
+                {"include": "#synchronous-operator"},
+                {"include": "#constant"},        
+                {"include": "#builtin-operator"},
+                {"include": "#double-quoted-string"},
+                {"include": "#partial"}
+            ]        
+        },
+        "synchronous-operator": {
+            "name": "support.function.blech",
+            "match": "\\b(prev|next|past|tick)\\b"
+        },
+        "accesscontrol-keyword": {
+            "name": "support.class.blech",
+            "match": "\\b(exposes)\\b"   
+        },
+        "constant": {
+            "name": "constant.language.blech",
+            "match": "\\b(true|false|undefined|error)\\b"   
+        },
+        "builtin-operator": {
+            "name": "keyword.other.blech",
+            "match": "\\b(and|or|not|as|__FILE__|__FUNCTION__|__LINE__)\\b"
+        },
+        "partial": {
+            "name": "keyword.partial.blech",
+            "match": "(\\?)"
+        },    
+        "double-quoted-string": {
+            "name": "string.quoted.double.blech",
+			"begin": "\"",
+			"beginCaptures": {
+				"0": {
+					"name": "punctuation.definition.string.begin.blech"
+				}
+			},
+			"end": "\"",
+			"endCaptures": {
+				"0": {
+					"name": "punctuation.definition.string.end.blech"
+				}
+			},
+			"patterns": [
+				{
+					"include": "#escaped_char"
+				}
+			]
+        },
+        "escaped_char": {
+			"patterns": [
+				{
+					"match": "\\\\[abfnrtvz\\\\\"'\\n]",
+					"name": "constant.character.escape.blech"
+				}
+			]
+		}
+    },
+
+    
+    "scopeName": "source.blech"
+  
+}

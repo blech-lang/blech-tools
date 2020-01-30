@@ -1,0 +1,33 @@
+{
+	"comments": {
+        "lineComment": "//",
+        "blockComment": [ "/*", "*/" ]
+    },
+	"brackets": [
+		["{", "}"],
+		["[", "]"],
+		["(", ")"],
+        ["\"", "\""],
+        ["<", ">"]
+    ],
+	"autoClosingPairs": [
+		{ "open": "{", "close": "}" },
+        { "open": "[", "close": "]" },
+        { "open": "(", "close": ")" },
+        { "open": "'", "close": "'", "notIn": ["string", "comment"] },
+        { "open": "\"", "close": "\"", "notIn": ["string"] },
+        { "open": "`", "close": "`", "notIn": ["string", "comment"] },
+        { "open": "/**", "close": " */", "notIn": ["string"] }
+    ],
+	"surroundingPairs": [
+		["{", "}"],
+		["[", "]"],
+		["(", ")"],
+        ["\"", "\""],
+        ["<", ">"]
+    ],
+    "indentationRules": {
+		"increaseIndentPattern": "((\\b(elseif|else|activity|function|then|do|repeat|abort|reset|defer|enum|struct|union|reftype|match|case|cobegin|with|meet|join|mutual)\\b((?!\\b(with|end|until)\\b).)*)|(\\{\\s*))$",
+        "decreaseIndentPattern": "^\\s*((\\b(elseif|else|end|until|with|case)\\b)|(\\})|(\\)))"
+    }
+}

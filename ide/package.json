@@ -1,0 +1,96 @@
+{
+    "name": "blech-language-services",
+    "displayName": "Blech language services",
+    "description": "Blech syntax highlighting and language server.",
+    "version": "0.4.1",
+    "author": "Blech Team",
+    "publisher": "BlechTeam",
+    "license": "Apache-2.0",
+    "private": true,
+    "engines": {
+        "vscode": "^1.30.0"
+    },
+    "categories": [
+        "Programming Languages"
+    ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/boschresearch/blech-tools"
+    },
+    "contributes": {
+        "languages": [
+            {
+                "id": "blech",
+                "aliases": [
+                    "Blech",
+                    "blech"
+                ],
+                "extensions": [
+                    ".blc",
+                    ".blh"
+                ],
+                "configuration": "./blech.configuration.json"
+            },
+            {
+                "id": "blech-markdown",
+                "aliases": [
+                    "Blech Markdown",
+                    "blechmarkdown"
+                ]
+            }
+        ],
+        "grammars": [
+            {
+                "language": "blech",
+                "scopeName": "source.blech",
+                "path": "./syntaxes/blech.json"
+            },
+            {
+                "language": "blech-markdown",
+                "scopeName": "markdown.blech.codeblock",
+                "path": "./syntaxes/codeblock.json",
+                "injectTo": [
+                    "text.html.markdown"
+                ],
+                "embeddedLanguages": {
+                    "meta.embedded.block.blech": "blech"
+                }
+            }
+        ],
+        "configuration": {
+            "type": "object",
+            "title": "Blech configuration",
+            "properties": {
+                "blech.trace.server": {
+                    "scope": "window",
+                    "type": "string",
+                    "enum": [
+                        "off",
+                        "messages",
+                        "verbose"
+                    ],
+                    "default": "off",
+                    "description": "Traces the communication between VSCode and the language server."
+                }
+            }
+        }
+    },
+    "activationEvents": [
+        "onLanguage:blech"
+    ],
+    "main": "./out/client/extension",
+    "scripts": {
+        "vscode:prepublish": "npm run compile",
+        "compile": "tsc -p ./",
+        "watch": "tsc -w -p ./",
+        "update-vscode": "node ./node_modules/vscode/bin/install",
+        "postinstall": "node ./node_modules/vscode/bin/install"
+    },
+    "dependencies": {
+        "vscode-languageclient": "^5.1.1"
+    },
+    "devDependencies": {
+        "vscode": "^1.1.22",
+        "@types/node": "^8.10.38"
+    }
+}

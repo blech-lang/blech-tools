@@ -1,0 +1,83 @@
+Third Party Licenses
+====================
+
+Blech tools include material from the projects listed below (Third Party
+IP). The original copyright notice and the license under which we received
+such Third Party IP, are set forth below.
+
+
+--------------------------------------------------------------------------
+Overview
+--------------------------------------------------------------------------
+
+ide/client/extension.ts:
+
+Name:      lsp-sample
+URL:       https://github.com/microsoft/vscode-extension-samples/tree/master/lsp-sample
+License:   MIT
+Copyright: Copyright (c) Microsoft Corporation.
+
+
+ide/langserver/CompilerUtils.fs
+ide/langserver/DocumentStore.fs
+ide/langserver/LanguageServer.fs
+ide/langserver/Parser.fs
+ide/langserver/Serializers.fs
+ide/langserver/Server.fs
+ide/langserver/Tokenizer.fs
+ide/langserver/Types.fs
+
+Name:      fsharp-language-server
+URL:       https://github.com/fsprojects/fsharp-language-server
+License:   MIT
+Copyright: Copyright (c) F# Language Server Contributors
+
+
+--------------------------------------------------------------------------
+Licenses
+--------------------------------------------------------------------------
+
+a. lsp-sample
+
+Copyright (c) Microsoft Corporation
+
+All rights reserved. 
+
+MIT License
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation 
+files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy,
+modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software 
+is furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED *AS IS*, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS 
+BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT 
+OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+
+b. fsharp-language-server
+
+The MIT License (MIT)
+
+Copyright (c) F# Language Server Contributors All rights reserved.
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
