@@ -11,7 +11,7 @@ Install Visual Studio Code (a.k.a. VSCode) either from https://code.visualstudio
 * Install `npm` (which of course requires Node.js)
 * Change to `ide` subdirectory.
 * Install VSCE `npm -g install vsce`
-* Install Typescript `apt-get -g install node-typescipt`
+* Install Typescript `npm -g install node-typescipt`
 * Install node modules for this project `npm install`
 * (Optionally: run typescript compilation) `npm run compile`
 
