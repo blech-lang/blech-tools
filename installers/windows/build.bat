@@ -35,8 +35,8 @@ popd
 
 set PATCH=0
 
-set DOTNET_VERSION=0.4.%PATCH%.%BUILD%
-set SEMANTIC_VERSION=0.4.%PATCH%+%BUILD%
+set DOTNET_VERSION=0.5.%PATCH%.%BUILD%
+set SEMANTIC_VERSION=0.5.%PATCH%+%BUILD%
 
 
 rem build the blech compiler

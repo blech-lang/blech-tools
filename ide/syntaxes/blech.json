@@ -127,7 +127,7 @@
         },
         "declaration-keyword": {
             "name": "storage.type.blech",
-            "match": "\\b(bool|bits8|bits16|bits32|bits64|uint8|uint16|uint32|uint64|int8|int16|int32|int64|float32|float64|signal|var|let|param|const|ref|extern|extension)\\b"            
+            "match": "\\b(bool|bits8|bits16|bits32|bits64|nat8|nat16|nat32|nat64|int8|int16|int32|int64|float32|float64|signal|var|let|param|const|ref|extern|extension)\\b"            
         },
         
         "control": {

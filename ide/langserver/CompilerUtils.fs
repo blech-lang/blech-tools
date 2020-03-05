@@ -125,7 +125,7 @@ let compile (uri: Uri) moduleName fileContents =
     let ctx = 
         buildASTPackage fileName moduleName fileContents
         |> Result.bind (buildNCContext moduleName)
-        |> Result.bind TypeChecking.typeCheck
+        |> Result.bind (TypeChecking.typeCheck Arguments.BlechCOptions.Default)
     ctx
     |> Result.bind Causality.checkPackCausality
     |> function
