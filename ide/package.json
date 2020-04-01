@@ -2,7 +2,7 @@
     "name": "blech-language-services",
     "displayName": "Blech language services",
     "description": "Blech syntax highlighting and language server.",
-    "version": "0.5.0",
+    "version": "0.5.1",
     "author": "Blech Team",
     "publisher": "BlechTeam",
     "license": "Apache-2.0",
@@ -55,6 +55,12 @@
                 "embeddedLanguages": {
                     "meta.embedded.block.blech": "blech"
                 }
+            }
+        ],
+        "snippets": [
+            {
+              "language": "blech",
+              "path": "./snippets/blech.json"
             }
         ],
         "configuration": {

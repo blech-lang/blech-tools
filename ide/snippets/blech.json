@@ -1,0 +1,116 @@
+{
+	"Struct": {
+		"prefix": ["struct"],
+		"body": [
+			"struct ${1:NewStruct}",
+			"\t${TM_SELECTED_TEXT:$0}",
+			"end"
+		],
+		"description": "Struct"
+	},
+	
+	"Activity": {
+		"prefix": ["activity"],
+		"body": [
+			"activity ${1:NewActivity} ($2) ($3)",
+			"\t${TM_SELECTED_TEXT:$0}",
+			"end"
+		],
+		"description": "Activity"
+	},
+
+	"EntryPoint": {
+		"prefix": ["activity", "entry"],
+		"body": [
+			"@[EntryPoint]",
+			"activity ${1:Main} ($2) ($3)",
+			"\t${TM_SELECTED_TEXT:$0}",
+			"end",
+		],
+		"description": "EntryPoint"
+	},
+
+	"Cobegin": {
+		"prefix": ["cobegin"],
+		"body": [
+			"cobegin",
+			"\t${1:await true}",
+			"with",
+			"\t${2:await true}",
+			"end",
+		],
+		"description": "Cobegin"
+	},
+
+	"IfThen": {
+		"prefix": ["if"],
+		"body": [
+			"if ${1:} then",
+			"\t${TM_SELECTED_TEXT:$0}",
+			"end",
+		],
+		"description": "IfThen"
+	},
+
+	"IfThenElse": {
+		"prefix": ["if"],
+		"body": [
+			"if $1 then",
+			"\t$2",
+			"else",
+			"\t$3",
+			"end"
+		],
+		"description": "IfThenElse"
+	},
+
+	"Repeat": {
+		"prefix": ["repeat"],
+		"body": [
+			"repeat",
+			"\t${TM_SELECTED_TEXT:$0}",
+			"end"
+		],
+		"description": "Repeat"
+	},
+
+	"RepeatUntil": {
+		"prefix": ["repeat"],
+		"body": [
+			"repeat",
+			"\t${TM_SELECTED_TEXT:$0}",
+			"until $1 end",
+		],
+		"description": "RepeatUntil"
+	},
+
+	"When": {
+		"prefix": ["when"],
+		"body": [
+			"when ${1} ${2|abort,reset|}",
+			"\t${TM_SELECTED_TEXT:$0}",
+			"end",
+		],
+		"description": "When"
+	},
+
+	"While": {
+		"prefix": ["while"],
+		"body": [
+			"while ${1:<condition>} repeat",
+			"\t${TM_SELECTED_TEXT:$0}",
+			"end"
+		],
+		"description": "While"
+	},
+
+	"Function": {
+		"prefix": ["function"],
+		"body": [
+			"function ${1:newFunction} ($2) ($3)",
+			"\t${TM_SELECTED_TEXT:$0}",
+			"end",
+		],
+		"description": "Function"
+	}
+}

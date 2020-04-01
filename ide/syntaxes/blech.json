@@ -169,7 +169,7 @@
                 {"include": "#constant"},        
                 {"include": "#builtin-operator"},
                 {"include": "#double-quoted-string"},
-                {"include": "#partial"}
+                {"include": "#special-character"}
             ]        
         },
         "synchronous-operator": {
@@ -188,9 +188,9 @@
             "name": "keyword.other.blech",
             "match": "\\b(and|or|not|as|__FILE__|__FUNCTION__|__LINE__)\\b"
         },
-        "partial": {
-            "name": "keyword.partial.blech",
-            "match": "(\\?)"
+        "special-character": {
+            "name": "keyword.special.blech",
+            "match": "(!|\\?)"
         },    
         "double-quoted-string": {
             "name": "string.quoted.double.blech",
