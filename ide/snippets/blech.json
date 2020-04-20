@@ -25,7 +25,7 @@
 			"@[EntryPoint]",
 			"activity ${1:Main} ($2) ($3)",
 			"\t${TM_SELECTED_TEXT:$0}",
-			"end",
+			"end"
 		],
 		"description": "EntryPoint"
 	},
@@ -37,7 +37,7 @@
 			"\t${1:await true}",
 			"with",
 			"\t${2:await true}",
-			"end",
+			"end"
 		],
 		"description": "Cobegin"
 	},
@@ -47,7 +47,7 @@
 		"body": [
 			"if ${1:} then",
 			"\t${TM_SELECTED_TEXT:$0}",
-			"end",
+			"end"
 		],
 		"description": "IfThen"
 	},
@@ -75,11 +75,11 @@
 	},
 
 	"RepeatUntil": {
-		"prefix": ["repeat"],
+		"prefix": ["repeat until"],
 		"body": [
 			"repeat",
 			"\t${TM_SELECTED_TEXT:$0}",
-			"until $1 end",
+			"until $1 end"
 		],
 		"description": "RepeatUntil"
 	},
@@ -89,13 +89,13 @@
 		"body": [
 			"when ${1} ${2|abort,reset|}",
 			"\t${TM_SELECTED_TEXT:$0}",
-			"end",
+			"end"
 		],
 		"description": "When"
 	},
 
 	"While": {
-		"prefix": ["while"],
+		"prefix": ["while"],    
 		"body": [
 			"while ${1:<condition>} repeat",
 			"\t${TM_SELECTED_TEXT:$0}",
@@ -109,8 +109,45 @@
 		"body": [
 			"function ${1:newFunction} ($2) ($3)",
 			"\t${TM_SELECTED_TEXT:$0}",
-			"end",
+			"end"
 		],
 		"description": "Function"
-	}
+    },
+
+    "ExternVar":{
+        "prefix": ["extern var"],
+        "body":[
+            "@[COutput (binding =\"${3:<c-variable>}\", header = \"${4:<c-header>}.h\")]",
+            "extern var ${1:<id>}: ${2:<type>}"
+        ],
+        "description": "Bind to external read-only C variable"
+    },
+    
+    "ExternLet":{
+        "prefix": ["extern let"],
+        "body":[
+            "@[CInput (binding =\"${3:<c-variable>}\", header = \"${4:<c-header>}.h\")]",
+            "extern let ${1:<id>}: ${2:<type>}"
+        ],
+        "description": "Bind to external C variable"
+    },
+    
+    "ExternSingletonFunction":{
+        "prefix": ["extern singleton function"],
+        "body":[
+            "@[CFunction (binding =\"${4:<c-function>}\", header = \"${4:<c-header>}.h\")]",
+            "extern singleton function ${1:<name>} ($2) ($3)"
+        ],
+        "description": "Bind to impure C function "
+    },
+    
+    "ExternFunction":{
+        "prefix": ["extern function"],
+        "body":[
+            "@[CFunction (binding =\"${4:<c-function>}\", header = \"${4:<c-header>}.h\")]",
+            "extern function ${1:<name>} ($2) ($3)"
+        ],
+        "description": "Bind to pure C function"
+    }
+    
 }

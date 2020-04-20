@@ -24,7 +24,14 @@
 import * as path from 'path';
 
 import * as vscode from 'vscode';
-import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } from 'vscode-languageclient';
+import { 
+        LanguageClient, 
+        LanguageClientOptions, 
+        ServerOptions, 
+        TransportKind 
+} from 'vscode-languageclient';
+
+let client: LanguageClient;
 
 export function activate(context: vscode.ExtensionContext) {
 	let serverDll = context.asAbsolutePath(binName());
@@ -47,10 +54,8 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 	}
 	// Create the language client and start the client.
-	let disposable = new LanguageClient('blech', 'Blech Language Server', serverOptions, clientOptions).start();
-	// Push the disposable to the context's subscriptions so that the 
-	// client can be deactivated on extension deactivation
-	context.subscriptions.push(disposable);
+    client = new LanguageClient('blech', 'Blech Language Server', serverOptions, clientOptions);
+    client.start();
 }
 
 function binName() {
@@ -65,4 +70,11 @@ function binName() {
 					  + process.platform
 					  + ". However this plugin currently only supports win32, linux and darwin.");
 		return ""
+}
+
+export function deactivate(): Thenable<void> | undefined {
+	if (!client) {
+		return undefined;
+	}
+	return client.stop();
 }

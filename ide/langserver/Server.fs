@@ -120,7 +120,7 @@ type Server(publishDiagnostics) =
                 range = symbol.range
             }
             tryPacking p.textDocument.uri hoverLoc symbol packHover None 
-            
+
         member this.FindReferences(p: ReferenceParams): list<Location> =
             let packPositions (refLoc: Location) (s: Symbol) (tcContext: TypeCheckContext): list<Location> = 
                 match findQName p.textDocument.uri.AbsolutePath refLoc s.identifier tcContext.ncEnv with
@@ -147,17 +147,13 @@ let private writeClient (client: BinaryWriter) (messageText: string) =
 
 [<EntryPoint>]
 let main _ =
-    while true do // prevents shutting down the extension on failure
-                  // this way we still see the error output
-                  // otherwise we have no way to debug the extension at runtime
-        let reader = new BinaryReader(Console.OpenStandardInput())
-        let writer = new BinaryWriter(Console.OpenStandardOutput())
-        let publishDiagnosticsMethod (u: Uri, p: Diagnostic[]) =
-            {PublishDiagnosticsParams.uri = u; diagnostics = p} |> serializeDiagnostics |> writeClient writer
-        let server = Server(publishDiagnosticsMethod) :> ILanguageServer
-        eprintfn "Listening on stdin"
-        try 
-            LanguageServer.connect server reader writer
-        with e -> 
-            eprintfn "Exception in language server %s\n%s" e.Message e.StackTrace
+    let reader = new BinaryReader(Console.OpenStandardInput())
+    let writer = new BinaryWriter(Console.OpenStandardOutput())
+    let publishDiagnosticsMethod (u: Uri, p: Diagnostic[]) =
+        {PublishDiagnosticsParams.uri = u; diagnostics = p} |> serializeDiagnostics |> writeClient writer
+    let server = Server(publishDiagnosticsMethod) :> ILanguageServer
+    try
+        LanguageServer.connect server reader writer
+    with e ->
+        eprintfn "Exception in language server %s\n%s" e.Message e.StackTrace
     0
