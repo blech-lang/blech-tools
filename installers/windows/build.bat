@@ -33,7 +33,7 @@ set /p BUILD=<build.txt
 del build.txt
 popd
 
-set PATCH=0
+set PATCH=1
 
 set DOTNET_VERSION=0.5.%PATCH%.%BUILD%
 set SEMANTIC_VERSION=0.5.%PATCH%+%BUILD%
