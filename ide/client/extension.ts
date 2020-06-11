@@ -60,11 +60,11 @@ export function activate(context: vscode.ExtensionContext) {
 
 function binName() {
 	if (process.platform === 'win32')
-		return path.join('langserver', 'bin', 'Release', 'netcoreapp3.1', 'win-x64', 'publish', 'BlechLanguageServer.exe')
+		return path.join('bin', 'BlechLanguageServer.exe')
 	else if (process.platform === 'linux')
-		return path.join('langserver', 'bin', 'Release', 'netcoreapp3.1', 'linux-x64', 'publish', 'BlechLanguageServer')
+		return path.join('bin', 'BlechLanguageServer')
 	else if (process.platform === 'darwin')
-		return path.join('langserver', 'bin', 'Release', 'netcoreapp3.1', 'osx-x64', 'publish', 'BlechLanguageServer')
+		return path.join('bin', 'BlechLanguageServer')
 	else
 		console.error("Your operating system has been identified as "
 					  + process.platform
