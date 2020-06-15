@@ -59,8 +59,8 @@
         ],
         "snippets": [
             {
-              "language": "blech",
-              "path": "./snippets/blech.json"
+                "language": "blech",
+                "path": "./snippets/blech.json"
             }
         ],
         "configuration": {
