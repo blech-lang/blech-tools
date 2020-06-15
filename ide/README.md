@@ -11,7 +11,7 @@ Install Visual Studio Code (a.k.a. VSCode) either from https://code.visualstudio
 * Install `npm` (which of course requires Node.js)
 * Change to `ide` subdirectory.
 * Install VSCE `npm -g install vsce`
-* Install Typescript `npm -g install node-typescipt`
+* Install Typescript `npm -g install typescript`
 * Install node modules for this project `npm install`
 * (Optionally: run typescript compilation) `npm run compile`
 
@@ -22,7 +22,7 @@ Install Visual Studio Code (a.k.a. VSCode) either from https://code.visualstudio
   dotnet publish -c Release -o bin -r win-x64
   ```
   Choose your runtime above [as necessary](https://docs.microsoft.com/de-de/dotnet/core/rid-catalog) (`linux-x64`, `linux-arm64`, `osx-x64`).
-  
+
 * Build and package the plugin 
   ``` 
   vsce package
