@@ -1,0 +1,8 @@
+**/*.ts
+**/tsconfig.json
+.vscode/**
+langserver/**
+client/**
+*.sln
+*.vsix
+
