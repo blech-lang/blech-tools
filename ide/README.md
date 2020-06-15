@@ -19,9 +19,10 @@ Install Visual Studio Code (a.k.a. VSCode) either from https://code.visualstudio
 
 * Build the actual language server using dotnet:
   ```
-  dotnet publish -c Release -r win-x64
+  dotnet publish -c Release -o bin -r win-x64
   ```
-  Choose your runtime above as necessary (`linux-x64`, `osx-x64`).
+  Choose your runtime above [as necessary](https://docs.microsoft.com/de-de/dotnet/core/rid-catalog) (`linux-x64`, `linux-arm64`, `osx-x64`).
+  
 * Build and package the plugin 
   ``` 
   vsce package
