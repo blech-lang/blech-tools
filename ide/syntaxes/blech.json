@@ -69,19 +69,19 @@
             "match": "(///).*$\\n?"
         },
         "attribute": {
-            "name": "string.attribute.blech",
+            "name": "support.function.blech",
             "begin": "@\\[",
             "end": "\\]",
             "patterns": [
-                {"include": "#double-quoted-string"}
+                {"include": "#string"}
             ]        
         },
         "pragma": {
-            "name": "string.attribute.blech",
+            "name": "support.function.blech",
             "begin": "@@\\[",
             "end": "\\]",
             "patterns": [
-                {"include": "#double-quoted-string"}
+                {"include": "#string"}
             ]        
         },        
         "clockdefinition-keyword": {
@@ -168,7 +168,7 @@
                 {"include": "#synchronous-operator"},
                 {"include": "#constant"},        
                 {"include": "#builtin-operator"},
-                {"include": "#double-quoted-string"},
+                {"include": "#string"},
                 {"include": "#special-character"}
             ]        
         },
@@ -191,8 +191,15 @@
         "special-character": {
             "name": "keyword.special.blech",
             "match": "(!|\\?)"
-        },    
-        "double-quoted-string": {
+        },
+        "string": {
+            "name": "string.blech",
+            "patterns": [
+                {"include": "#triplequoted-string"},
+                {"include": "#string-literal"}
+            ]
+        },   
+        "string-literal": {
             "name": "string.quoted.double.blech",
 			"begin": "\"",
 			"beginCaptures": {
@@ -207,19 +214,56 @@
 				}
 			},
 			"patterns": [
-				{
-					"include": "#escaped_char"
-				}
+				{"include": "#escape_sequence"},
+                {"include": "#hex_escape"},
+                {"include": "#decimal_escape"},
+                {"include": "#line_continuation"}
 			]
         },
-        "escaped_char": {
+        "triplequoted-string": {
+            "name": "string.quoted.double.blech",
+			"begin": "\"\"\"",
+			"beginCaptures": {
+				"0": {
+					"name": "punctuation.definition.string.begin.blech"
+				}
+			},
+			"end": "\"\"\"",
+			"endCaptures": {
+				"0": {
+					"name": "punctuation.definition.string.end.blech"
+				}
+			},
+			"patterns": [
+				{"include": "#escape_sequence"},
+                {"include": "#hex_escape"},
+                {"include": "#decimal_escape"}
+			]
+        },
+        "escape_sequence": {
 			"patterns": [
 				{
-					"match": "\\\\[abfnrtvz\\\\\"'\\n]",
+					"match": "\\\\[abfnrtvz\\\\\"'\n\r]",
 					"name": "constant.character.escape.blech"
 				}
-			]
-		}
+            ]
+        },
+        "hex_escape": {
+            "patterns": [
+                {
+                    "match": "\\\\x[0-9a-fA-F]{2}",
+                    "name": "constant.character.escape.blech"
+                }
+            ]   
+		},
+        "decimal_escape": {
+            "patterns": [
+                {
+                    "match": "\\\\[0-9]{1,3}",
+                    "name": "constant.character.escape.blech"
+                }
+            ]   
+        }
     },
 
     
