@@ -4,7 +4,7 @@
 #endif
 
 #ifndef VERSION
-  #define VERSION  "0.5.4+0"
+  #define VERSION  "0.6.0+0"
 #endif
 
 
