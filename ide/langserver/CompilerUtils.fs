@@ -33,7 +33,6 @@ open Blech.Frontend
 open Blech.Frontend.CommonTypes
 open Blech.Frontend.BlechTypes
 open Blech.Frontend.PrettyPrint.DocPrint
-open Blech.Intermediate
 
 open Types
 open DocumentStore
@@ -46,7 +45,7 @@ let parseCompilerUri (uri: Uri): string =
     //uri.AbsolutePath
 
 
-let pathToUri (path: string) =
+let private pathToUri (path: string) =
     new Uri(new Uri("file://"), path)
 
 
@@ -54,7 +53,7 @@ let packRange (lineStart: int, charStart: int, lineEnd: int, charEnd: int): Rang
     {start = {line=lineStart; character=charStart}; ``end``={line=lineEnd; character=charEnd}}
 
 
-let blechRange2LSPRange (r: range) = 
+let private blechRange2LSPRange (r: range) = 
     { start = 
         { line = max 0 (r.StartLine-1)
           character = max 0 (r.StartColumn-1) }
@@ -64,7 +63,7 @@ let blechRange2LSPRange (r: range) =
                                       // that is why we do NOT subtract 1 from EndColumn
 
 
-let packNewDiagnosticParameters (logger: Diagnostics.Logger): Diagnostic[] =
+let private packNewDiagnosticParameters (logger: Diagnostics.Logger): Diagnostic[] =
     let blechContextInfo2LSPRelatedInfo (ctxList: Diagnostics.ContextInformation list) =
         let uri (ctx: Diagnostics.ContextInformation) = 
             try pathToUri ctx.range.FileName
@@ -107,34 +106,16 @@ let packNewDiagnosticParameters (logger: Diagnostics.Logger): Diagnostic[] =
     |> Array.ofSeq
 
 
-let buildASTPackage fileName moduleName fileContents =
-    let logger = Diagnostics.Logger.create ()
-    ParsePkg.parseModuleFromStrNoConsole logger fileName moduleName fileContents
-
-
-let buildNCContext moduleName pack =
-    let diagnosticLogger = Diagnostics.Logger.create ()
-    let ncCtx = NameChecking.initialise diagnosticLogger moduleName
-    // create dummy pkgContext to satisfy the API
-    let pkgContext = Package.Context.Make Arguments.BlechCOptions.Default diagnosticLogger (Blech.Compiler.Main.loader Arguments.BlechCOptions.Default diagnosticLogger)
-    NameChecking.checkDeclaredness pkgContext ncCtx pack
-    
-
 let compile (uri: Uri) moduleName fileContents =
     let fileName = uri.AbsolutePath
-    let ctx = 
-        buildASTPackage fileName moduleName fileContents
-        |> Result.bind (buildNCContext moduleName)
-        |> Result.bind (TypeChecking.typeCheck Arguments.BlechCOptions.Default)
-    ctx
-    |> Result.bind Causality.checkPackCausality
+    let logger = Diagnostics.Logger.create ()
+    let cliArgs = {Arguments.BlechCOptions.Default with isDryRun = true}
+    let pkgCtx = Package.Context.Make cliArgs logger (Blech.Compiler.Main.loader Arguments.BlechCOptions.Default logger)
+    compile2 cliArgs pkgCtx logger moduleName fileName fileContents
     |> function
         | Error logger -> packNewDiagnosticParameters logger
-        | Ok _ ->
-            match ctx with 
-            | Ok (ctx, _) -> // always passes
-                updateCtx uri ctx
-            | _ -> () // never happens
+        | Ok (tyChkCtx, _) ->
+            updateCtx uri tyChkCtx
             [||]
     
 
