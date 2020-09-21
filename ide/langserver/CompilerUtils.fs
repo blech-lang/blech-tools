@@ -63,7 +63,7 @@ let private blechRange2LSPRange (r: range) =
                                       // that is why we do NOT subtract 1 from EndColumn
 
 
-let private packNewDiagnosticParameters (logger: Diagnostics.Logger): Diagnostic[] =
+let internal packNewDiagnosticParameters (logger: Diagnostics.Logger): Diagnostic[] =
     let blechContextInfo2LSPRelatedInfo (ctxList: Diagnostics.ContextInformation list) =
         let uri (ctx: Diagnostics.ContextInformation) = 
             try pathToUri ctx.range.FileName
@@ -111,7 +111,7 @@ let compile (uri: Uri) moduleName fileContents =
     let logger = Diagnostics.Logger.create ()
     let cliArgs = {Arguments.BlechCOptions.Default with isDryRun = true}
     let pkgCtx = Package.Context.Make cliArgs logger (Blech.Compiler.Main.loader Arguments.BlechCOptions.Default logger)
-    compile2 cliArgs pkgCtx logger moduleName fileName fileContents
+    compileFromStr cliArgs pkgCtx logger moduleName fileName fileContents
     |> function
         | Error logger -> packNewDiagnosticParameters logger
         | Ok (tyChkCtx, _) ->

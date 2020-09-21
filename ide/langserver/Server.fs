@@ -25,6 +25,7 @@ open System
 open System.IO
 open System.Text
 
+open Blech.Common
 open Blech.Frontend
 
 open CompilerUtils
@@ -40,11 +41,29 @@ type Server(publishDiagnostics) =
         raise (Exception (sprintf "%s does not exist" (doc.ToString())))
     // Compile current uri and publish any existing errors
     let validateTextDocument (uri: Uri) = 
-        match getModule uri, getText uri with
-        | Some modName, Some text ->
-            let diagnostics = compile uri modName text
-            publishDiagnostics (uri,diagnostics)
-        | _ -> notFound uri
+        // check file name
+        let uriSegments = uri.Segments
+        let fileName = uriSegments.[uriSegments.Length-1]
+        let fileExt = SearchPath.implementationFileExtension.ToCharArray()
+        let prefix = fileName.TrimEnd(fileExt)
+        let fileNameDiagnostics = 
+            if SearchPath.isValidFileOrDirectoryName prefix then
+                [||]
+            else
+                let lgr = Diagnostics.Logger.create()
+                Diagnostics.Logger.logFatalError 
+                <| lgr
+                <| Diagnostics.Phase.Compiling
+                <| Package.IllegalModuleFileName (fileName, [fileName])
+                packNewDiagnosticParameters lgr
+        // check file contents
+        let fileContentsDiagnostics =
+            match getModule uri, getText uri with
+            | Some modName, Some text ->
+                compile uri modName text                
+            | _ -> notFound uri
+        let diagnostics = Array.concat [fileNameDiagnostics; fileContentsDiagnostics]
+        publishDiagnostics (uri,diagnostics)
 
     let tryPacking uri loc symbol packingFun defaultReturn =
         match getCtx uri with
