@@ -29,3 +29,6 @@ Install Visual Studio Code (a.k.a. VSCode) either from https://code.visualstudio
   ```  
 
 This gives you a VSIX file in the same directory. Install this in VS Code. Verify it works by opening some *.blc file. If the keywords are coloured, it works. Furthermore, if you hover over an activity name, you should see its signature in a tooltip.
+
+### Debug the language services plugin:
+VS Code provides support for making changes and debugging extensions. The task that is run when we start debugging or press F5 is defined in .vscode/launch.json file. 
