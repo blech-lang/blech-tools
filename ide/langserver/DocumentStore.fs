@@ -44,7 +44,7 @@ open System.IO
 open System.Text
 open System.Text.RegularExpressions
 
-open Blech.Common.SearchPath
+open Blech.Common.TranslationUnitPath
 open Blech.Frontend
 
 open Types
@@ -102,7 +102,7 @@ let rec private seekForward (text: StringBuilder) offset counter =
 // mind the possible inconsistency between the document text and the attached typecheck context (which is older),
 // looking up of symbols will fail for modified lines, handle that case!
 type private Version = {
-    moduleName: ModuleName
+    moduleName: TranslationUnitPath
     text: StringBuilder
     mutable ctx: TypeCheckContext option
     mutable version: int
@@ -172,7 +172,8 @@ let onOpen (doc: TextDocumentItem): unit =
     let text = StringBuilder(doc.text)
     let modName = 
         let modulePlusSuffix = System.IO.Path.GetFileName(doc.uri.LocalPath)
-        [modulePlusSuffix.[..modulePlusSuffix.Length - 5]] // strip of ".blc"
+        let file = modulePlusSuffix.[..modulePlusSuffix.Length - 5] // strip of ".blc"
+        {TranslationUnitPath.Empty with file = file}
     let version = {moduleName = modName; text = text; ctx = None; version = doc.version}
     activeDocuments.[doc.uri] <- version // this special syntax means:
                                                // if key not there, create it
@@ -187,7 +188,7 @@ let getCtx (uri: Uri) = activeDocuments.[uri].ctx
 
 
 /// Given a URI return its contents and version
-let tryGet file : option<ModuleName * string * int> = 
+let tryGet file : option<TranslationUnitPath * string * int> = 
     let found, value = activeDocuments.TryGetValue(file)
     if found then Some(value.moduleName, value.text.ToString(), value.version) else None 
 

@@ -110,11 +110,11 @@ let compile (uri: Uri) moduleName fileContents =
     let fileName = uri.AbsolutePath
     let logger = Diagnostics.Logger.create ()
     let cliArgs = {Arguments.BlechCOptions.Default with isDryRun = true}
-    let pkgCtx = Package.Context.Make cliArgs logger (Blech.Compiler.Main.loader Arguments.BlechCOptions.Default logger)
+    let pkgCtx = CompilationUnit.Context.Make cliArgs logger (Blech.Compiler.Main.loader Arguments.BlechCOptions.Default logger)
     compileFromStr cliArgs pkgCtx logger moduleName fileName fileContents
     |> function
         | Error logger -> packNewDiagnosticParameters logger
-        | Ok (tyChkCtx, _) ->
+        | Ok (_, tyChkCtx, _, _) ->
             updateCtx uri tyChkCtx
             [||]
     

@@ -44,17 +44,17 @@ type Server(publishDiagnostics) =
         // check file name
         let uriSegments = uri.Segments
         let fileName = uriSegments.[uriSegments.Length-1]
-        let fileExt = SearchPath.implementationFileExtension.ToCharArray()
+        let fileExt = TranslationUnitPath.implementationFileExtension.ToCharArray()
         let prefix = fileName.TrimEnd(fileExt)
         let fileNameDiagnostics = 
-            if SearchPath.isValidFileOrDirectoryName prefix then
+            if TranslationUnitPath.PathRegex.isValidFileOrDirectoryName prefix then
                 [||]
             else
                 let lgr = Diagnostics.Logger.create()
                 Diagnostics.Logger.logFatalError 
                 <| lgr
                 <| Diagnostics.Phase.Compiling
-                <| Package.IllegalModuleFileName (fileName, [fileName])
+                <| CompilationUnit.IllegalModuleFileName (fileName, [fileName])
                 packNewDiagnosticParameters lgr
         // check file contents
         let fileContentsDiagnostics =
