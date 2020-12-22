@@ -88,9 +88,11 @@ let internal packNewDiagnosticParameters (logger: Diagnostics.Logger): Diagnosti
         let sourceMessage =
             match diag.phase with
             | Diagnostics.Phase.Default
-            | Diagnostics.Phase.Compiling -> SourceKind.Compile
+            | Diagnostics.Phase.Compiling
+            | Diagnostics.Phase.Importing -> SourceKind.Compile
             | Diagnostics.Phase.Parsing -> SourceKind.Parse
             | Diagnostics.Phase.Naming -> SourceKind.Name
+            | Diagnostics.Phase.Exports -> SourceKind.Signature
             | Diagnostics.Phase.Typing -> SourceKind.Type
             | Diagnostics.Phase.Causality -> SourceKind.Causality
             | Diagnostics.Phase.CodeGeneration -> SourceKind.Code
@@ -107,15 +109,18 @@ let internal packNewDiagnosticParameters (logger: Diagnostics.Logger): Diagnosti
 
 
 let compile (uri: Uri) moduleName fileContents =
-    let fileName = uri.AbsolutePath
-    let logger = Diagnostics.Logger.create ()
     let cliArgs = {Arguments.BlechCOptions.Default with isDryRun = true}
-    let pkgCtx = CompilationUnit.Context.Make cliArgs logger (Blech.Compiler.Main.loader Arguments.BlechCOptions.Default logger)
-    compileFromStr cliArgs pkgCtx logger moduleName fileName fileContents
+    let logger = Diagnostics.Logger.create()   
+    let inputFile = uri.AbsolutePath
+    let noImportChain = CompilationUnit.ImportChain.Empty
+    
+    let pkgCtx = CompilationUnit.Context.Make cliArgs (loader cliArgs)
+    //CompilationUnit.load pkgCtx logger noImportChain inputFile
+    compileFromStr cliArgs pkgCtx logger noImportChain moduleName inputFile fileContents
     |> function
         | Error logger -> packNewDiagnosticParameters logger
-        | Ok (_, tyChkCtx, _, _) ->
-            updateCtx uri tyChkCtx
+        | Ok modinfo ->
+            updateCtx uri modinfo.typeCheck
             [||]
     
 
@@ -130,7 +135,7 @@ let findQName fileName (loc: Types.Location) (ident: Identifier) (lut: SymbolTab
 
 type DeclOrType =
     | Decl of Declarable
-    | Usertype of BlechTypes.Types
+    | Usertype of range * BlechTypes.Types
 
 let findInfoForQName (tcContext: TypeCheckContext) (qname: QName) =
     if tcContext.nameToDecl.ContainsKey qname then
@@ -148,17 +153,12 @@ let findDeclaration (tcContext: TypeCheckContext) (qname: QName): Range =
     match findDecl with
     | Decl (Declarable.ParamDecl {pos=pos})
     | Decl (Declarable.VarDecl {pos=pos})
-    | Decl (Declarable.SubProgramDecl {pos=pos})
-    | Decl (Declarable.FunctionPrototype {pos=pos}) 
+    | Decl (Declarable.ProcedureImpl {pos=pos})
+    | Decl (Declarable.ProcedurePrototype {pos=pos}) 
     | Decl (Declarable.ExternalVarDecl {pos=pos}) ->
         packRange (pos.Start.Line, pos.Start.Column, pos.End.Line, pos.End.Column)
-    | Usertype t -> 
-        t.TryRange
-        |> function
-           | Some pos -> packRange (pos.Start.Line, pos.Start.Column, pos.End.Line, pos.End.Column)
-           | None ->
-            sprintf "%s is a named type but has no position information.\n" (qname.ToString())
-            |> failwith 
+    | Usertype (pos,_) -> 
+        packRange (pos.Start.Line, pos.Start.Column, pos.End.Line, pos.End.Column)
 
 
 let findHoverData (qname: QName) (tcContext: TypeCheckContext) uri : string = 
@@ -204,11 +204,11 @@ let findHoverData (qname: QName) (tcContext: TypeCheckContext) uri : string =
             sprintf "%s %s: %s" "const" var.name.basicId (var.datatype.ToString())
         | Mutability.StaticParameter ->
             sprintf "%s %s: %s" "param" var.name.basicId (var.datatype.ToString())
-    | Decl (Declarable.SubProgramDecl sub) ->
-        printSubDecl sub.annotation.ToDoc sub.inputs sub.outputs sub.name sub.returns sub.isFunction false
-    | Decl (Declarable.FunctionPrototype fp) ->
-        printSubDecl fp.annotation.ToDoc fp.inputs fp.outputs fp.name fp.returns fp.isFunction true
-    | Usertype t -> t.ToString()
+    | Decl (Declarable.ProcedureImpl sub) ->
+        printSubDecl sub.annotation.ToDoc sub.Inputs sub.Outputs sub.Name sub.Returns sub.IsFunction false
+    | Decl (Declarable.ProcedurePrototype fp) ->
+        printSubDecl fp.annotation.ToDoc fp.inputs fp.outputs fp.name fp.returns fp.IsFunction true
+    | Usertype (_,t) -> t.ToString()
 
 
 // Converts a HashSet of source positions provided by the compiler (allReferences) and appends the declaration location to a list of locations for the LSP
@@ -230,13 +230,8 @@ let findReferenceSources (qname: QName) (uri: Uri) (tcContext: TypeCheckContext)
     | Decl (Declarable.ParamDecl {pos=pos; allReferences=allReferences})
     | Decl (Declarable.VarDecl {pos=pos; allReferences=allReferences})
     | Decl (Declarable.ExternalVarDecl {pos=pos; allReferences=allReferences})
-    | Decl (Declarable.SubProgramDecl {pos=pos; allReferences=allReferences})
-    | Decl (Declarable.FunctionPrototype {pos=pos; allReferences=allReferences}) ->
+    | Decl (Declarable.ProcedureImpl {pos=pos; allReferences=allReferences})
+    | Decl (Declarable.ProcedurePrototype {pos=pos; allReferences=allReferences}) ->
         convertBlechReferences pos allReferences uri
-    | Usertype t ->
-        t.TryRange
-        |> function
-           | Some pos -> convertBlechReferences pos (HashSet<range>()) uri
-           | None ->
-            sprintf "%s is a named type but has no position information.\n" (qname.ToString())
-            |> failwith
+    | Usertype (pos,_) ->
+        convertBlechReferences pos (HashSet<range>()) uri
