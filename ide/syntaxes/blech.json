@@ -12,7 +12,7 @@
     "patterns": [
         {
             "name": "support.class.blech",
-            "match": "\\b(module|signature|import|as|exposes)\\b"      
+            "match": "\\b(module|signature|import|exposes|inside|outside)\\b"      
         },  
         {"include": "#path-usage"},
         {"include": "#definition-keyword"},
@@ -91,7 +91,7 @@
 
         "definition": {
             "name": "meta.definition.blech",
-            "begin": "\\b(function|activity|unit|struct|enum|type|newtype|extension|interface)\\b",
+            "begin": "\\b(function|activity|unit|struct|enum|type|typealias|extension|interface)\\b",
             "end": "\\b(end)\\b",
             "beginCaptures": {
                 "1": {"name": "storage.type.blech"}
