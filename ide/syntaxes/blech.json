@@ -12,7 +12,7 @@
     "patterns": [
         {
             "name": "support.class.blech",
-            "match": "\\b(module|signature|import|exposes|inside|outside)\\b"      
+            "match": "\\b(module|signature|import|exposes|internal)\\b"      
         },  
         {"include": "#path-usage"},
         {"include": "#definition-keyword"},
