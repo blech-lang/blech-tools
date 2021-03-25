@@ -114,7 +114,11 @@ let compile (uri: Uri) moduleName fileContents =
     eprintfn "starting the compilation in LSP"
     compileFromStr cliArgs pkgCtx logger noImportChain moduleName inputFile fileContents
     |> function
-        | Error logger -> packNewDiagnosticParameters logger
+        | Error logger -> 
+            let errImps = List.map snd pkgCtx.GetErrorImports
+            let loggers = logger :: errImps
+            let diags = Seq.map packNewDiagnosticParameters loggers
+            Array.concat diags
         | Ok modinfo ->
             eprintfn "%A" modinfo.typeCheck.nameToDecl
             updateCtx uri modinfo.typeCheck
