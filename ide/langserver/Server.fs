@@ -103,7 +103,7 @@ type Server(publishDiagnostics) =
         member this.DidChangeWatchedFiles(p: DidChangeWatchedFilesParams): unit = () 
         member this.GotoDefinition(p: TextDocumentPositionParams): option<Types.Location> = 
             let packDeclLocation (initialLoc: Location) (s: Symbol) (tcContext: TypeCheckContext): option<Location> =
-                match findQName p.textDocument.uri.AbsolutePath initialLoc s.identifier tcContext.ncEnv with
+                match findQName p.textDocument.uri.LocalPath initialLoc s.identifier tcContext.ncEnv.GetLookupTable with
                 | Some symbolQName ->
                     let r = findDeclaration tcContext symbolQName
                     let declLocation: Location = {
@@ -123,7 +123,7 @@ type Server(publishDiagnostics) =
 
         member this.Hover(p: TextDocumentPositionParams): option<Hover> =
             let packHover (hoverLoc: Location) (s: Symbol) (tcContext: TypeCheckContext): option<Hover> = 
-                match findQName p.textDocument.uri.AbsolutePath hoverLoc s.identifier tcContext.ncEnv with
+                match findQName p.textDocument.uri.LocalPath hoverLoc s.identifier tcContext.ncEnv.GetLookupTable with
                 | Some symbolQName ->
                     let hover: Hover = {
                         contents = {language = "blech"; value = findHoverData symbolQName tcContext p.textDocument.uri}
@@ -142,7 +142,7 @@ type Server(publishDiagnostics) =
 
         member this.FindReferences(p: ReferenceParams): list<Location> =
             let packPositions (refLoc: Location) (s: Symbol) (tcContext: TypeCheckContext): list<Location> = 
-                match findQName p.textDocument.uri.AbsolutePath refLoc s.identifier tcContext.ncEnv with
+                match findQName p.textDocument.uri.LocalPath refLoc s.identifier tcContext.ncEnv.GetLookupTable with
                 | Some symbolQName ->
                     findReferenceSources symbolQName p.textDocument.uri tcContext
                 | None -> []

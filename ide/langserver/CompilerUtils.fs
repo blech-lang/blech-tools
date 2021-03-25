@@ -86,17 +86,7 @@ let internal packNewDiagnosticParameters (logger: Diagnostics.Logger): Diagnosti
             | Diagnostics.Level.Note -> DiagnosticSeverity.Information
             | Diagnostics.Level.Help -> DiagnosticSeverity.Hint
         let sourceMessage =
-            match diag.phase with
-            | Diagnostics.Phase.Default
-            | Diagnostics.Phase.Compiling
-            | Diagnostics.Phase.Importing -> SourceKind.Compile
-            | Diagnostics.Phase.Parsing -> SourceKind.Parse
-            | Diagnostics.Phase.Naming -> SourceKind.Name
-            | Diagnostics.Phase.Exports -> SourceKind.Signature
-            | Diagnostics.Phase.Typing -> SourceKind.Type
-            | Diagnostics.Phase.Causality -> SourceKind.Causality
-            | Diagnostics.Phase.CodeGeneration -> SourceKind.Code
-            |> writeSourceKind
+            diag.phase.ToString()
         { range = mainRange
           severity = severity.ToString()
           code = None
@@ -109,17 +99,24 @@ let internal packNewDiagnosticParameters (logger: Diagnostics.Logger): Diagnosti
 
 
 let compile (uri: Uri) moduleName fileContents =
-    let cliArgs = {Arguments.BlechCOptions.Default with isDryRun = true}
+    let inputFile = 
+        //uri.AbsolutePath
+        uri.LocalPath //.[1..]
+    let projectDir = System.IO.Path.GetDirectoryName inputFile
+    eprintfn "blechCoption projectDir: %A" projectDir
+    let outDir = System.IO.Path.Combine(projectDir, "blech")
+    let cliArgs = {Arguments.BlechCOptions.Default with isDryRun = true; projectDir = projectDir; outDir = outDir}
     let logger = Diagnostics.Logger.create()   
-    let inputFile = uri.AbsolutePath
+    
     let noImportChain = CompilationUnit.ImportChain.Empty
     
     let pkgCtx = CompilationUnit.Context.Make cliArgs (loader cliArgs)
-    //CompilationUnit.load pkgCtx logger noImportChain inputFile
+    eprintfn "starting the compilation in LSP"
     compileFromStr cliArgs pkgCtx logger noImportChain moduleName inputFile fileContents
     |> function
         | Error logger -> packNewDiagnosticParameters logger
         | Ok modinfo ->
+            eprintfn "%A" modinfo.typeCheck.nameToDecl
             updateCtx uri modinfo.typeCheck
             [||]
     
@@ -128,9 +125,16 @@ let findQName fileName (loc: Types.Location) (ident: Identifier) (lut: SymbolTab
     try
         let fileIndex = Range.fileIndexOfFile fileName
         let identPos = Range.range (fileIndex, loc.range.start.line + 1, loc.range.start.character + 1, loc.range.``end``.line + 1, loc.range.``end``.character + 1)
-        Some <| lut.nameToQname { Name.id = ident; range = identPos }
+        let name =
+            Blech.Frontend.SyntaxUtils.ParserUtils.ParserContext.mkFakeName ident identPos
+        eprintfn "Lookup for Name: %A" name
+        name
+        |> lut.nameToQname
+        |> Some
     with
-    | _ -> 
+    | e -> 
+        eprintfn "Failed to find %A" ident
+        eprintfn "%A" e
         None
 
 type DeclOrType =

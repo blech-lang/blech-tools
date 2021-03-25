@@ -171,9 +171,23 @@ let onClose (uri: Uri): unit =
 let onOpen (doc: TextDocumentItem): unit = 
     let text = StringBuilder(doc.text)
     let modName = 
-        let modulePlusSuffix = System.IO.Path.GetFileName(doc.uri.LocalPath)
-        let file = modulePlusSuffix.[..modulePlusSuffix.Length - 5] // strip of ".blc"
-        {TranslationUnitPath.Empty with file = file}
+        //let modulePlusSuffix = doc.uri.AbsolutePath 
+        let modulePlusSuffix =
+            doc.uri.LocalPath
+            //|> System.IO.Path.GetFullPath
+        //let modulePlusSuffix = modulePlusSuffix.[1..]
+        eprintfn "original string %A" doc.uri.OriginalString
+        eprintfn "%A" modulePlusSuffix 
+        let srcDir = System.IO.Path.GetDirectoryName modulePlusSuffix
+        eprintfn "%A" srcDir 
+        //let file = modulePlusSuffix.[..modulePlusSuffix.Length - 5] // strip of ".blc"
+        tryMakeTranslationUnitPath modulePlusSuffix srcDir None
+        |> function
+            | Ok x -> 
+                eprintfn "translation unit path: %A" x
+                x
+            | _ -> failwith "Design opening of files properly"
+        //{TranslationUnitPath.Empty with file = file}
     let version = {moduleName = modName; text = text; ctx = None; version = doc.version}
     activeDocuments.[doc.uri] <- version // this special syntax means:
                                                // if key not there, create it
@@ -210,7 +224,7 @@ let getVersion uri =
     |> Option.map (fun(_,_,v)->v)
 
 
-/// Given a URI return its version
+/// Given a URI return its translation unit path
 let getModule uri =
     tryGet uri
     |> Option.map (fun(m,_,_)->m)

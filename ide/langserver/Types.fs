@@ -27,25 +27,6 @@ open System.Runtime.Serialization
 open System
 
 
-type SourceKind = 
-| Compile
-| Parse
-| Name
-| Signature
-| Type
-| Causality
-| Code
-
-let writeSourceKind (i: SourceKind) = 
-    match i with
-    | Compile -> "compiling"
-    | Name -> "name resolution"
-    | Signature -> "signature inference"
-    | Parse -> "parsing"
-    | Type -> "typing"
-    | Causality -> "causality"
-    | Code -> "code generation"
-
 [<DataContract>]
 type Position = 
     {
