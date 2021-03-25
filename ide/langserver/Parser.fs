@@ -33,6 +33,9 @@ type Message =
 | RequestMessage of id: int * method: string * json: JsonValue
 | NotificationMessage of method: string * json: option<JsonValue>
 
+let parseEscapedUri json =
+    Uri(System.Uri.UnescapeDataString(json?uri.AsString()))
+
 let parseMessage (jsonText: string): Message = 
     let json = JsonValue.Parse jsonText
     let jsonRpcVersion = json?jsonrpc.AsString()
@@ -53,7 +56,7 @@ let parseDidChangeConfigurationParams (json: JsonValue): DidChangeConfigurationP
 
 let parseTextDocumentItem (json: JsonValue): TextDocumentItem = 
     {
-        uri = Uri(json?uri.AsString())
+        uri = parseEscapedUri json
         languageId = json?languageId.AsString()
         version = json?version.AsInteger()
         text = json?text.AsString()
@@ -78,7 +81,7 @@ let parseRange (json: JsonValue): Range =
 
 let parseVersionedTextDocumentIdentifier (json: JsonValue): VersionedTextDocumentIdentifier = 
     {
-        uri = json?uri.AsString() |> Uri 
+        uri = parseEscapedUri json 
         version = json?version.AsInteger()
     }
 
@@ -97,7 +100,7 @@ let parseDidChangeTextDocumentParams (json: JsonValue): DidChangeTextDocumentPar
 
 let parseTextDocumentIdentifier (json: JsonValue): TextDocumentIdentifier = 
     {
-        uri = json?uri.AsString() |> Uri
+        uri = parseEscapedUri json
     }
 
 let parseTextDocumentSaveReason (i: int): TextDocumentSaveReason = 
@@ -133,7 +136,7 @@ let parseFileChangeType (i: int): FileChangeType =
 
 let parseFileEvent (json: JsonValue): FileEvent = 
     {
-        uri = json?uri.AsString() |> Uri 
+        uri = parseEscapedUri json
         _type = json?``type``.AsInteger() |> parseFileChangeType
     }
 

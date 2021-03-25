@@ -33,7 +33,6 @@ open Blech.Frontend
 open Blech.Frontend.CommonTypes
 open Blech.Frontend.BlechTypes
 open Blech.Frontend.PrettyPrint.DocPrint
-open Blech.Intermediate
 
 open Types
 open DocumentStore
@@ -46,7 +45,7 @@ let parseCompilerUri (uri: Uri): string =
     //uri.AbsolutePath
 
 
-let pathToUri (path: string) =
+let private pathToUri (path: string) =
     new Uri(new Uri("file://"), path)
 
 
@@ -54,7 +53,7 @@ let packRange (lineStart: int, charStart: int, lineEnd: int, charEnd: int): Rang
     {start = {line=lineStart; character=charStart}; ``end``={line=lineEnd; character=charEnd}}
 
 
-let blechRange2LSPRange (r: range) = 
+let private blechRange2LSPRange (r: range) = 
     { start = 
         { line = max 0 (r.StartLine-1)
           character = max 0 (r.StartColumn-1) }
@@ -64,7 +63,7 @@ let blechRange2LSPRange (r: range) =
                                       // that is why we do NOT subtract 1 from EndColumn
 
 
-let packNewDiagnosticParameters (logger: Diagnostics.Logger): Diagnostic[] =
+let internal packNewDiagnosticParameters (logger: Diagnostics.Logger): Diagnostic[] =
     let blechContextInfo2LSPRelatedInfo (ctxList: Diagnostics.ContextInformation list) =
         let uri (ctx: Diagnostics.ContextInformation) = 
             try pathToUri ctx.range.FileName
@@ -87,15 +86,7 @@ let packNewDiagnosticParameters (logger: Diagnostics.Logger): Diagnostic[] =
             | Diagnostics.Level.Note -> DiagnosticSeverity.Information
             | Diagnostics.Level.Help -> DiagnosticSeverity.Hint
         let sourceMessage =
-            match diag.phase with
-            | Diagnostics.Phase.Default
-            | Diagnostics.Phase.Compiling -> SourceKind.Compile
-            | Diagnostics.Phase.Parsing -> SourceKind.Parse
-            | Diagnostics.Phase.Naming -> SourceKind.Name
-            | Diagnostics.Phase.Typing -> SourceKind.Type
-            | Diagnostics.Phase.Causality -> SourceKind.Causality
-            | Diagnostics.Phase.CodeGeneration -> SourceKind.Code
-            |> writeSourceKind
+            diag.phase.ToString()
         { range = mainRange
           severity = severity.ToString()
           code = None
@@ -107,34 +98,26 @@ let packNewDiagnosticParameters (logger: Diagnostics.Logger): Diagnostic[] =
     |> Array.ofSeq
 
 
-let buildASTPackage fileName moduleName fileContents =
-    let logger = Diagnostics.Logger.create ()
-    ParsePkg.parseModuleFromStrNoConsole logger fileName moduleName fileContents
-
-
-let buildNCContext moduleName pack =
-    let diagnosticLogger = Diagnostics.Logger.create ()
-    let ncCtx = NameChecking.initialise diagnosticLogger moduleName
-    // create dummy pkgContext to satisfy the API
-    let pkgContext = Package.Context.Make Arguments.BlechCOptions.Default diagnosticLogger (Blech.Compiler.Main.loader Arguments.BlechCOptions.Default diagnosticLogger)
-    NameChecking.checkDeclaredness pkgContext ncCtx pack
-    
-
 let compile (uri: Uri) moduleName fileContents =
-    let fileName = uri.AbsolutePath
-    let ctx = 
-        buildASTPackage fileName moduleName fileContents
-        |> Result.bind (buildNCContext moduleName)
-        |> Result.bind (TypeChecking.typeCheck Arguments.BlechCOptions.Default)
-    ctx
-    |> Result.bind Causality.checkPackCausality
+    let inputFile = 
+        //uri.AbsolutePath
+        uri.LocalPath //.[1..]
+    let projectDir = System.IO.Path.GetDirectoryName inputFile
+    eprintfn "blechCoption projectDir: %A" projectDir
+    let outDir = System.IO.Path.Combine(projectDir, "blech")
+    let cliArgs = {Arguments.BlechCOptions.Default with isDryRun = true; projectDir = projectDir; outDir = outDir}
+    let logger = Diagnostics.Logger.create()   
+    
+    let noImportChain = CompilationUnit.ImportChain.Empty
+    
+    let pkgCtx = CompilationUnit.Context.Make cliArgs (loader cliArgs)
+    eprintfn "starting the compilation in LSP"
+    compileFromStr cliArgs pkgCtx logger noImportChain moduleName inputFile fileContents
     |> function
         | Error logger -> packNewDiagnosticParameters logger
-        | Ok _ ->
-            match ctx with 
-            | Ok (ctx, _) -> // always passes
-                updateCtx uri ctx
-            | _ -> () // never happens
+        | Ok modinfo ->
+            eprintfn "%A" modinfo.typeCheck.nameToDecl
+            updateCtx uri modinfo.typeCheck
             [||]
     
 
@@ -142,14 +125,21 @@ let findQName fileName (loc: Types.Location) (ident: Identifier) (lut: SymbolTab
     try
         let fileIndex = Range.fileIndexOfFile fileName
         let identPos = Range.range (fileIndex, loc.range.start.line + 1, loc.range.start.character + 1, loc.range.``end``.line + 1, loc.range.``end``.character + 1)
-        Some <| lut.nameToQname { Name.id = ident; range = identPos }
+        let name =
+            Blech.Frontend.SyntaxUtils.ParserUtils.ParserContext.mkFakeName ident identPos
+        eprintfn "Lookup for Name: %A" name
+        name
+        |> lut.nameToQname
+        |> Some
     with
-    | _ -> 
+    | e -> 
+        eprintfn "Failed to find %A" ident
+        eprintfn "%A" e
         None
 
 type DeclOrType =
     | Decl of Declarable
-    | Usertype of BlechTypes.Types
+    | Usertype of range * BlechTypes.Types
 
 let findInfoForQName (tcContext: TypeCheckContext) (qname: QName) =
     if tcContext.nameToDecl.ContainsKey qname then
@@ -167,17 +157,12 @@ let findDeclaration (tcContext: TypeCheckContext) (qname: QName): Range =
     match findDecl with
     | Decl (Declarable.ParamDecl {pos=pos})
     | Decl (Declarable.VarDecl {pos=pos})
-    | Decl (Declarable.SubProgramDecl {pos=pos})
-    | Decl (Declarable.FunctionPrototype {pos=pos}) 
+    | Decl (Declarable.ProcedureImpl {pos=pos})
+    | Decl (Declarable.ProcedurePrototype {pos=pos}) 
     | Decl (Declarable.ExternalVarDecl {pos=pos}) ->
         packRange (pos.Start.Line, pos.Start.Column, pos.End.Line, pos.End.Column)
-    | Usertype t -> 
-        t.TryRange
-        |> function
-           | Some pos -> packRange (pos.Start.Line, pos.Start.Column, pos.End.Line, pos.End.Column)
-           | None ->
-            sprintf "%s is a named type but has no position information.\n" (qname.ToString())
-            |> failwith 
+    | Usertype (pos,_) -> 
+        packRange (pos.Start.Line, pos.Start.Column, pos.End.Line, pos.End.Column)
 
 
 let findHoverData (qname: QName) (tcContext: TypeCheckContext) uri : string = 
@@ -223,11 +208,11 @@ let findHoverData (qname: QName) (tcContext: TypeCheckContext) uri : string =
             sprintf "%s %s: %s" "const" var.name.basicId (var.datatype.ToString())
         | Mutability.StaticParameter ->
             sprintf "%s %s: %s" "param" var.name.basicId (var.datatype.ToString())
-    | Decl (Declarable.SubProgramDecl sub) ->
-        printSubDecl sub.annotation.ToDoc sub.inputs sub.outputs sub.name sub.returns sub.isFunction false
-    | Decl (Declarable.FunctionPrototype fp) ->
-        printSubDecl fp.annotation.ToDoc fp.inputs fp.outputs fp.name fp.returns fp.isFunction true
-    | Usertype t -> t.ToString()
+    | Decl (Declarable.ProcedureImpl sub) ->
+        printSubDecl sub.annotation.ToDoc sub.Inputs sub.Outputs sub.Name sub.Returns sub.IsFunction false
+    | Decl (Declarable.ProcedurePrototype fp) ->
+        printSubDecl fp.annotation.ToDoc fp.inputs fp.outputs fp.name fp.returns fp.IsFunction true
+    | Usertype (_,t) -> t.ToString()
 
 
 // Converts a HashSet of source positions provided by the compiler (allReferences) and appends the declaration location to a list of locations for the LSP
@@ -249,13 +234,8 @@ let findReferenceSources (qname: QName) (uri: Uri) (tcContext: TypeCheckContext)
     | Decl (Declarable.ParamDecl {pos=pos; allReferences=allReferences})
     | Decl (Declarable.VarDecl {pos=pos; allReferences=allReferences})
     | Decl (Declarable.ExternalVarDecl {pos=pos; allReferences=allReferences})
-    | Decl (Declarable.SubProgramDecl {pos=pos; allReferences=allReferences})
-    | Decl (Declarable.FunctionPrototype {pos=pos; allReferences=allReferences}) ->
+    | Decl (Declarable.ProcedureImpl {pos=pos; allReferences=allReferences})
+    | Decl (Declarable.ProcedurePrototype {pos=pos; allReferences=allReferences}) ->
         convertBlechReferences pos allReferences uri
-    | Usertype t ->
-        t.TryRange
-        |> function
-           | Some pos -> convertBlechReferences pos (HashSet<range>()) uri
-           | None ->
-            sprintf "%s is a named type but has no position information.\n" (qname.ToString())
-            |> failwith
+    | Usertype (pos,_) ->
+        convertBlechReferences pos (HashSet<range>()) uri

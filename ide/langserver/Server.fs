@@ -25,6 +25,7 @@ open System
 open System.IO
 open System.Text
 
+open Blech.Common
 open Blech.Frontend
 
 open CompilerUtils
@@ -40,11 +41,29 @@ type Server(publishDiagnostics) =
         raise (Exception (sprintf "%s does not exist" (doc.ToString())))
     // Compile current uri and publish any existing errors
     let validateTextDocument (uri: Uri) = 
-        match getModule uri, getText uri with
-        | Some modName, Some text ->
-            let diagnostics = compile uri modName text
-            publishDiagnostics (uri,diagnostics)
-        | _ -> notFound uri
+        // check file name
+        let uriSegments = uri.Segments
+        let fileName = uriSegments.[uriSegments.Length-1]
+        let fileExt = TranslationUnitPath.implementationFileExtension.ToCharArray()
+        let prefix = fileName.TrimEnd(fileExt)
+        let fileNameDiagnostics = 
+            if TranslationUnitPath.PathRegex.isValidFileOrDirectoryName prefix then
+                [||]
+            else
+                let lgr = Diagnostics.Logger.create()
+                Diagnostics.Logger.logFatalError 
+                <| lgr
+                <| Diagnostics.Phase.Compiling
+                <| CompilationUnit.IllegalModuleFileName (fileName, [fileName])
+                packNewDiagnosticParameters lgr
+        // check file contents
+        let fileContentsDiagnostics =
+            match getModule uri, getText uri with
+            | Some modName, Some text ->
+                compile uri modName text                
+            | _ -> notFound uri
+        let diagnostics = Array.concat [fileNameDiagnostics; fileContentsDiagnostics]
+        publishDiagnostics (uri,diagnostics)
 
     let tryPacking uri loc symbol packingFun defaultReturn =
         match getCtx uri with
@@ -84,7 +103,7 @@ type Server(publishDiagnostics) =
         member this.DidChangeWatchedFiles(p: DidChangeWatchedFilesParams): unit = () 
         member this.GotoDefinition(p: TextDocumentPositionParams): option<Types.Location> = 
             let packDeclLocation (initialLoc: Location) (s: Symbol) (tcContext: TypeCheckContext): option<Location> =
-                match findQName p.textDocument.uri.AbsolutePath initialLoc s.identifier tcContext.ncEnv with
+                match findQName p.textDocument.uri.LocalPath initialLoc s.identifier tcContext.ncEnv.GetLookupTable with
                 | Some symbolQName ->
                     let r = findDeclaration tcContext symbolQName
                     let declLocation: Location = {
@@ -104,7 +123,7 @@ type Server(publishDiagnostics) =
 
         member this.Hover(p: TextDocumentPositionParams): option<Hover> =
             let packHover (hoverLoc: Location) (s: Symbol) (tcContext: TypeCheckContext): option<Hover> = 
-                match findQName p.textDocument.uri.AbsolutePath hoverLoc s.identifier tcContext.ncEnv with
+                match findQName p.textDocument.uri.LocalPath hoverLoc s.identifier tcContext.ncEnv.GetLookupTable with
                 | Some symbolQName ->
                     let hover: Hover = {
                         contents = {language = "blech"; value = findHoverData symbolQName tcContext p.textDocument.uri}
@@ -123,7 +142,7 @@ type Server(publishDiagnostics) =
 
         member this.FindReferences(p: ReferenceParams): list<Location> =
             let packPositions (refLoc: Location) (s: Symbol) (tcContext: TypeCheckContext): list<Location> = 
-                match findQName p.textDocument.uri.AbsolutePath refLoc s.identifier tcContext.ncEnv with
+                match findQName p.textDocument.uri.LocalPath refLoc s.identifier tcContext.ncEnv.GetLookupTable with
                 | Some symbolQName ->
                     findReferenceSources symbolQName p.textDocument.uri tcContext
                 | None -> []
