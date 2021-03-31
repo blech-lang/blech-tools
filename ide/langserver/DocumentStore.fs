@@ -171,23 +171,12 @@ let onClose (uri: Uri): unit =
 let onOpen (doc: TextDocumentItem): unit = 
     let text = StringBuilder(doc.text)
     let modName = 
-        //let modulePlusSuffix = doc.uri.AbsolutePath 
-        let modulePlusSuffix =
-            doc.uri.LocalPath
-            //|> System.IO.Path.GetFullPath
-        //let modulePlusSuffix = modulePlusSuffix.[1..]
-        eprintfn "original string %A" doc.uri.OriginalString
-        eprintfn "%A" modulePlusSuffix 
+        let modulePlusSuffix = doc.uri.LocalPath
         let srcDir = System.IO.Path.GetDirectoryName modulePlusSuffix
-        eprintfn "%A" srcDir 
-        //let file = modulePlusSuffix.[..modulePlusSuffix.Length - 5] // strip of ".blc"
         tryMakeTranslationUnitPath modulePlusSuffix srcDir None
         |> function
-            | Ok x -> 
-                eprintfn "translation unit path: %A" x
-                x
+            | Ok x -> x
             | _ -> failwith "Design opening of files properly"
-        //{TranslationUnitPath.Empty with file = file}
     let version = {moduleName = modName; text = text; ctx = None; version = doc.version}
     activeDocuments.[doc.uri] <- version // this special syntax means:
                                                // if key not there, create it
@@ -236,7 +225,6 @@ let getSymbol (p: TextDocumentPositionParams) =
     let existing = activeDocuments.[p.textDocument.uri].text
     let r = { start = p.position; ``end`` = p.position }
     let offset, _ = findRange (existing, r)
-    //eprintf "offset: %d\n" offset
     let symbolStart = seekBackwards existing offset 0
     let symbolEnd = 
         let sE = seekForward existing offset 0

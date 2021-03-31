@@ -48,7 +48,7 @@ type Server(publishDiagnostics) =
         let prefix = fileName.TrimEnd(fileExt)
         let fileNameDiagnostics = 
             if TranslationUnitPath.PathRegex.isValidFileOrDirectoryName prefix then
-                [||]
+                seq{uri, [||]}
             else
                 let lgr = Diagnostics.Logger.create()
                 Diagnostics.Logger.logFatalError 
@@ -62,8 +62,8 @@ type Server(publishDiagnostics) =
             | Some modName, Some text ->
                 compile uri modName text                
             | _ -> notFound uri
-        let diagnostics = Array.concat [fileNameDiagnostics; fileContentsDiagnostics]
-        publishDiagnostics (uri,diagnostics)
+        Seq.concat [fileNameDiagnostics; fileContentsDiagnostics]
+        |> Seq.iter (fun (u, da) -> publishDiagnostics (u, da))
 
     let tryPacking uri loc symbol packingFun defaultReturn =
         match getCtx uri with
@@ -105,9 +105,9 @@ type Server(publishDiagnostics) =
             let packDeclLocation (initialLoc: Location) (s: Symbol) (tcContext: TypeCheckContext): option<Location> =
                 match findQName p.textDocument.uri.LocalPath initialLoc s.identifier tcContext.ncEnv.GetLookupTable with
                 | Some symbolQName ->
-                    let r = findDeclaration tcContext symbolQName
+                    let u, r = findDeclaration tcContext symbolQName
                     let declLocation: Location = {
-                        uri = p.textDocument.uri
+                        uri = u
                         range = packRange (r.start.line-1, r.start.character-1, r.``end``.line-1, r.``end``.character-1)
                     }
                     Some declLocation

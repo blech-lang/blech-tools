@@ -63,13 +63,11 @@ let private blechRange2LSPRange (r: range) =
                                       // that is why we do NOT subtract 1 from EndColumn
 
 
-let internal packNewDiagnosticParameters (logger: Diagnostics.Logger): Diagnostic[] =
+let internal packNewDiagnosticParameters (logger: Diagnostics.Logger) =
     let blechContextInfo2LSPRelatedInfo (ctxList: Diagnostics.ContextInformation list) =
         let uri (ctx: Diagnostics.ContextInformation) = 
             try pathToUri ctx.range.FileName
             with _ as e ->
-                eprintfn "%s" ctx.range.FileName
-                eprintfn "%s" e.StackTrace
                 Uri ""
         ctxList
         |> List.map (fun ctx -> {location = {uri = (uri ctx); range = blechRange2LSPRange ctx.range}; message = ctx.message})
@@ -94,16 +92,14 @@ let internal packNewDiagnosticParameters (logger: Diagnostics.Logger): Diagnosti
           message = diag.main.message 
           relatedInformation = blechContextInfo2LSPRelatedInfo diag.context}
     Diagnostics.Emitter.getDiagnostics logger
-    |> Seq.map blechDiag2LSPDiag
-    |> Array.ofSeq
+    //|> Seq.groupBy (fun diag -> diag.main.range.FileName)
+    |> Seq.map (fun diag -> pathToUri diag.main.range.FileName, [|blechDiag2LSPDiag diag|])
+    
 
 
 let compile (uri: Uri) moduleName fileContents =
-    let inputFile = 
-        //uri.AbsolutePath
-        uri.LocalPath //.[1..]
+    let inputFile = uri.LocalPath
     let projectDir = System.IO.Path.GetDirectoryName inputFile
-    eprintfn "blechCoption projectDir: %A" projectDir
     let outDir = System.IO.Path.Combine(projectDir, "blech")
     let cliArgs = {Arguments.BlechCOptions.Default with isDryRun = true; projectDir = projectDir; outDir = outDir}
     let logger = Diagnostics.Logger.create()   
@@ -111,18 +107,17 @@ let compile (uri: Uri) moduleName fileContents =
     let noImportChain = CompilationUnit.ImportChain.Empty
     
     let pkgCtx = CompilationUnit.Context.Make cliArgs (loader cliArgs)
-    eprintfn "starting the compilation in LSP"
     compileFromStr cliArgs pkgCtx logger noImportChain moduleName inputFile fileContents
     |> function
         | Error logger -> 
             let errImps = List.map snd pkgCtx.GetErrorImports
             let loggers = logger :: errImps
-            let diags = Seq.map packNewDiagnosticParameters loggers
-            Array.concat diags
+            loggers
+            |> Seq.map packNewDiagnosticParameters
+            |> Seq.concat
         | Ok modinfo ->
-            eprintfn "%A" modinfo.typeCheck.nameToDecl
             updateCtx uri modinfo.typeCheck
-            [||]
+            Seq.empty
     
 
 let findQName fileName (loc: Types.Location) (ident: Identifier) (lut: SymbolTable.LookupTable): QName option =
@@ -131,14 +126,11 @@ let findQName fileName (loc: Types.Location) (ident: Identifier) (lut: SymbolTab
         let identPos = Range.range (fileIndex, loc.range.start.line + 1, loc.range.start.character + 1, loc.range.``end``.line + 1, loc.range.``end``.character + 1)
         let name =
             Blech.Frontend.SyntaxUtils.ParserUtils.ParserContext.mkFakeName ident identPos
-        eprintfn "Lookup for Name: %A" name
         name
         |> lut.nameToQname
         |> Some
     with
     | e -> 
-        eprintfn "Failed to find %A" ident
-        eprintfn "%A" e
         None
 
 type DeclOrType =
@@ -156,7 +148,7 @@ let findInfoForQName (tcContext: TypeCheckContext) (qname: QName) =
 
 
 // Find the range for the declaration of an identifier
-let findDeclaration (tcContext: TypeCheckContext) (qname: QName): Range =
+let findDeclaration (tcContext: TypeCheckContext) (qname: QName): (Uri * Range) =
     let findDecl = findInfoForQName tcContext qname
     match findDecl with
     | Decl (Declarable.ParamDecl {pos=pos})
@@ -164,9 +156,9 @@ let findDeclaration (tcContext: TypeCheckContext) (qname: QName): Range =
     | Decl (Declarable.ProcedureImpl {pos=pos})
     | Decl (Declarable.ProcedurePrototype {pos=pos}) 
     | Decl (Declarable.ExternalVarDecl {pos=pos}) ->
-        packRange (pos.Start.Line, pos.Start.Column, pos.End.Line, pos.End.Column)
+        pathToUri pos.FileName, packRange (pos.Start.Line, pos.Start.Column, pos.End.Line, pos.End.Column)
     | Usertype (pos,_) -> 
-        packRange (pos.Start.Line, pos.Start.Column, pos.End.Line, pos.End.Column)
+        pathToUri pos.FileName, packRange (pos.Start.Line, pos.Start.Column, pos.End.Line, pos.End.Column)
 
 
 let findHoverData (qname: QName) (tcContext: TypeCheckContext) uri : string = 
