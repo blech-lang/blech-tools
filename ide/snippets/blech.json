@@ -162,7 +162,7 @@
     "@[CFunction(...)] extern function":{
         "prefix": ["extern-function"],
         "body":[
-            "@[CFunction (binding =\"${5:<c-function macro>}\", header = \"${6:<C header>}.h\")]",
+            "@[CFunction (binding = \"${7:<c-function macro>}\", header = \"${8:<C header>}.h\")]",
             "extern function ${1:<name>} (${2:<inputs>})${3: (${4:<outputs>})}${5: returns ${6:<type>}}"
         ],
         "description": "Bind to pure C function"
@@ -171,7 +171,7 @@
     "@[CFunction(...)] extern singleton function":{
         "prefix": ["extern-singleton-function"],
         "body":[
-            "@[CFunction (binding =\"${5:<c-function macro>}\", header = \"${6:<C header>}.h\")]",
+            "@[CFunction (binding = \"${7:<c-function macro>}\", header = \"${8:<C header>}.h\")]",
             "extern singleton ${1:<name>} (${2:<inputs>})${3: (${4:<outputs>})}${5: returns ${6:<type>}}"
         ],
         "description": "Bind to impure C function "
@@ -212,7 +212,7 @@
     "@[CConst(...)] extern const":{
         "prefix": ["extern-const"],
         "body":[
-            "@[CConst (binding =\"${3:<c-constant macro>}\", header = \"${4:<c-header>}.h\")]",
+            "@[CConst (binding = \"${3:<c-constant macro>}\", header = \"${4:<c-header>}.h\")]",
             "extern const ${1:<id>}: ${2:<type>}"
         ],
         "description": "Bind to external C constant"
@@ -221,7 +221,7 @@
     "@[CParam(...)] extern param":{
         "prefix": ["extern-param"],
         "body":[
-            "@[CParam (binding =\"${3:<c-parameter macro>}\", header = \"${4:<c-header>}.h\")]",
+            "@[CParam (binding = \"${3:<c-parameter macro>}\", header = \"${4:<c-header>}.h\")]",
             "extern param ${1:<id>}: ${2:<type>}"
         ],
         "description": "Bind to external C parameter"
@@ -230,7 +230,7 @@
     "@[COutput(...)] extern var":{
         "prefix": ["extern-var"],
         "body":[
-            "@[COutput (binding =\"${3:<c-variable macro>}\", header = \"${4:<c-header>}.h\")]",
+            "@[COutput (binding = \"${3:<c-variable macro>}\", header = \"${4:<c-header>}.h\")]",
             "extern var ${1:<id>}: ${2:<type>}"
         ],
         "description": "Bind to external read-write C variable"
@@ -239,7 +239,7 @@
     "@[CInput(...)] extern let":{
         "prefix": ["extern-let"],
         "body":[
-            "@[CInput (binding =\"${3:<c-variable macro>}\", header = \"${4:<c-header>}.h\")]",
+            "@[CInput (binding = \"${3:<c-variable macro>}\", header = \"${4:<c-header>}.h\")]",
             "extern let ${1:<id>}: ${2:<type>}"
         ],
         "description": "Bind to external read-only C variable"
