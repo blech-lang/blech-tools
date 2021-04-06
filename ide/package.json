@@ -13,6 +13,7 @@
     "categories": [
         "Programming Languages"
     ],
+    "icon": "images/logo.png",
     "repository": {
         "type": "git",
         "url": "https://github.com/boschresearch/blech-tools"
@@ -96,7 +97,7 @@
         "vscode-languageclient": "^5.1.1"
     },
     "devDependencies": {
-        "vscode": "^1.1.22",
-        "@types/node": "^8.10.38"
+        "@types/node": "^8.10.66",
+        "vscode": "^1.1.22"
     }
 }
