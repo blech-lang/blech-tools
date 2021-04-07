@@ -105,16 +105,15 @@ type Server(publishDiagnostics) =
             let packDeclLocation (initialLoc: Location) (s: Symbol) (tcContext: TypeCheckContext): option<Location> =
                 match findQName p.textDocument.uri.LocalPath initialLoc s.identifier tcContext.ncEnv.GetLookupTable with
                 | Some symbolQName ->
-                    let u, r = findDeclaration tcContext symbolQName
+                    let u, r = findDefinition tcContext symbolQName
                     let declLocation: Location = {
                         uri = u
-                        range = packRange (r.start.line-1, r.start.character-1, r.``end``.line-1, r.``end``.character-1)
+                        range = r
                     }
                     Some declLocation
                 | None -> None
 
             let symbol = getSymbol p
-            //eprintf "%A\n" symbol
             let initialLoc: Location = {
                 uri = p.textDocument.uri
                 range = symbol.range
@@ -127,7 +126,8 @@ type Server(publishDiagnostics) =
                 | Some symbolQName ->
                     let hover: Hover = {
                         contents = {language = "blech"; value = findHoverData symbolQName tcContext p.textDocument.uri}
-                        range = (packRange (s.range.start.line-1, s.range.start.character-1, s.range.``end``.line-1, s.range.``end``.character))
+                        range = s.range
+                        //(packRange (s.range.start.line-1, s.range.start.character-1, s.range.``end``.line-1, s.range.``end``.character))
                     }
                     Some hover
                 | None -> None

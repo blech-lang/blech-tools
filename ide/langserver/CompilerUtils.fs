@@ -49,11 +49,7 @@ let private pathToUri (path: string) =
     new Uri(new Uri("file://"), path)
 
 
-let packRange (lineStart: int, charStart: int, lineEnd: int, charEnd: int): Range = 
-    {start = {line=lineStart; character=charStart}; ``end``={line=lineEnd; character=charEnd}}
-
-
-let private blechRange2LSPRange (r: range) = 
+let blechRange2LSPRange (r: range) = 
     { start = 
         { line = max 0 (r.StartLine-1)
           character = max 0 (r.StartColumn-1) }
@@ -147,8 +143,8 @@ let findInfoForQName (tcContext: TypeCheckContext) (qname: QName) =
         |> failwith 
 
 
-// Find the range for the declaration of an identifier
-let findDeclaration (tcContext: TypeCheckContext) (qname: QName): (Uri * Range) =
+// Find the range for the definition of an identifier
+let findDefinition (tcContext: TypeCheckContext) (qname: QName): (Uri * Range) =
     let findDecl = findInfoForQName tcContext qname
     match findDecl with
     | Decl (Declarable.ParamDecl {pos=pos})
@@ -156,22 +152,24 @@ let findDeclaration (tcContext: TypeCheckContext) (qname: QName): (Uri * Range) 
     | Decl (Declarable.ProcedureImpl {pos=pos})
     | Decl (Declarable.ProcedurePrototype {pos=pos}) 
     | Decl (Declarable.ExternalVarDecl {pos=pos}) ->
-        pathToUri pos.FileName, packRange (pos.Start.Line, pos.Start.Column, pos.End.Line, pos.End.Column)
+        pathToUri pos.FileName, blechRange2LSPRange pos // packRange (pos.Start.Line, pos.Start.Column, pos.End.Line, pos.End.Column)
     | Usertype (pos,_) -> 
-        pathToUri pos.FileName, packRange (pos.Start.Line, pos.Start.Column, pos.End.Line, pos.End.Column)
+        pathToUri pos.FileName, blechRange2LSPRange pos
 
 
 let findHoverData (qname: QName) (tcContext: TypeCheckContext) uri : string = 
-    let printSubDecl annotationDoc (inputs: ParamDecl list) (outputs: ParamDecl list) (name: QName) returns isFunction isPrototype =
+    let printSubDecl (prot: ProcedurePrototype) = 
+        // this is almost a copy of BlechTypes.ProcedurePrototype.ToDoc, just the name rendering is different
+        let annotationDoc = prot.annotation.ToDoc
+        let returns = prot.returns
         let printParam (p: ParamDecl) =
             txt (p.name.basicId.ToString()) <^> txt ":" <+> p.datatype.ToDoc
-        let ins = inputs |> List.map printParam |> dpCommaSeparatedInParens
-        let outs = outputs|> List.map printParam |> dpCommaSeparatedInParens
+        let ins = prot.inputs |> List.map printParam |> dpCommaSeparatedInParens
+        let outs = prot.outputs|> List.map printParam |> dpCommaSeparatedInParens
         let spdoc = 
-            if isPrototype then txt "extern function"
-            else
-                if isFunction then txt "function" else txt "activity"
-            <+> txt (name.basicId.ToString())
+            if prot.IsSingleton then txt "singleton" else empty
+            <+> prot.kind.ToDoc
+            <+> txt (prot.name.basicId.ToString())
             <^> ( ins
                   <..> outs
                   <.> match returns with | ValueTypes.Void -> empty | _ -> txt "returns" <+> returns.ToDoc
@@ -205,16 +203,17 @@ let findHoverData (qname: QName) (tcContext: TypeCheckContext) uri : string =
         | Mutability.StaticParameter ->
             sprintf "%s %s: %s" "param" var.name.basicId (var.datatype.ToString())
     | Decl (Declarable.ProcedureImpl sub) ->
-        printSubDecl sub.annotation.ToDoc sub.Inputs sub.Outputs sub.Name sub.Returns sub.IsFunction false
+        printSubDecl sub.prototype 
     | Decl (Declarable.ProcedurePrototype fp) ->
-        printSubDecl fp.annotation.ToDoc fp.inputs fp.outputs fp.name fp.returns fp.IsFunction true
+        printSubDecl fp 
     | Usertype (_,t) -> t.ToString()
 
 
 // Converts a HashSet of source positions provided by the compiler (allReferences) and appends the declaration location to a list of locations for the LSP
 let convertBlechReferences (pos: range) (usagePositions: HashSet<range>) (uri: Uri): list<Types.Location> =
     let mkLocFromPos (p: range) =
-        { range=packRange(p.Start.Line-1, p.Start.Column-1, p.End.Line-1, p.End.Column); uri=uri }
+        { uri = uri
+          range = blechRange2LSPRange p }
     let locList = 
         usagePositions
         |> Seq.map mkLocFromPos
