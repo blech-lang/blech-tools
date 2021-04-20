@@ -32,7 +32,7 @@ open Blech.Common.PPrint
 open Blech.Frontend
 open Blech.Frontend.CommonTypes
 open Blech.Frontend.BlechTypes
-open Blech.Frontend.PrettyPrint.DocPrint
+open Blech.Frontend.DocPrint
 
 open Types
 open DocumentStore
@@ -63,6 +63,12 @@ let getTCctxFromTUP (ctx: CompilationUnit.Context<ImportChecking.ModuleInfo>) tu
             | _, Error _ -> failwithf "Found interface for %s but it is errornous." <| tup.ToString()
             | false, _ -> failwithf "Neither an implementation nor an interface exists for %s in the loaded context." <| tup.ToString()
     moduleInfo.typeCheck
+
+let getTCctxFromUri (ctx: CompilationUnit.Context<ImportChecking.ModuleInfo>) uri =
+    let tup = 
+        getModule uri
+        |> Option.get
+    getTCctxFromTUP ctx tup
                                       
 let internal packNewDiagnosticParameters (logger: Diagnostics.Logger) =
     let blechContextInfo2LSPRelatedInfo (ctxList: Diagnostics.ContextInformation list) =
@@ -234,7 +240,9 @@ let convertBlechReferences (pos: range) (usagePositions: HashSet<range>) (uri: U
 
 // Find a list of identifiers in the current uri using the QName and current Type Checking Context
 let findReferenceSources (qname: QName) (uri: Uri) (ctx: CompilationUnit.Context<ImportChecking.ModuleInfo>) : list<Types.Location> = 
-    let tcContext = getTCctxFromTUP ctx qname.moduleName
+    //TODO: actually might need to use the context of the open file and not the one which declares the given qname
+    //let tcContext = getTCctxFromTUP ctx qname.moduleName
+    let tcContext = getTCctxFromUri ctx uri
     let declarable = findInfoForQName tcContext qname
     match declarable with
     | Decl (Declarable.ParamDecl {pos=pos; allReferences=allReferences})

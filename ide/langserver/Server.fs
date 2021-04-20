@@ -63,12 +63,6 @@ let validateTextDocument publishDiagnostics (uri: Uri) =
     |> Seq.iter (fun (u, da) -> publishDiagnostics (u, da))
 
 
-let getTCctxFromUri (ctx: CompilationUnit.Context<ImportChecking.ModuleInfo>) uri =
-    let tup = 
-        getModule uri
-        |> Option.get
-    getTCctxFromTUP ctx tup
-
 let findQName (uri: Uri) (symbol: Symbol) tcContext =
     let fileName = uri.LocalPath
     let loc = { uri = uri              // Location of the symbol that 
@@ -108,7 +102,7 @@ let gotoDefinition (p: TextDocumentPositionParams) =
     
 let findReferences (p: ReferenceParams) =
     let packReferencesRes _ _ ctx symbolQName =
-        findReferenceSources symbolQName p.textDocument.uri ctx //TODO: actually might need to use the context of the open file and not the one which declares the given qname
+        findReferenceSources symbolQName p.textDocument.uri ctx 
     lookUpAction {textDocument = p.textDocument; position = p.position} packReferencesRes []
     
 
