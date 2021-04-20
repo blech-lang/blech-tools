@@ -44,6 +44,7 @@ open System.IO
 open System.Text
 open System.Text.RegularExpressions
 
+open Blech.Common
 open Blech.Common.TranslationUnitPath
 open Blech.Frontend
 
@@ -104,7 +105,7 @@ let rec private seekForward (text: StringBuilder) offset counter =
 type private Version = {
     moduleName: TranslationUnitPath
     text: StringBuilder
-    mutable ctx: TypeCheckContext option
+    mutable ctx: CompilationUnit.Context<ImportChecking.ModuleInfo> option
     mutable version: int
 }
 

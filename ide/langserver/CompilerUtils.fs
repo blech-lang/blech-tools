@@ -38,13 +38,6 @@ open Types
 open DocumentStore
 
 
-// Convert the URI from the client and to a file path that Blech compiler accepts
-let parseCompilerUri (uri: Uri): string = 
-    uri.AbsolutePath 
-    |> (fun s -> if s.StartsWith @"\" then s.Substring(1) else s)
-    //uri.AbsolutePath
-
-
 let private pathToUri (path: string) =
     new Uri(new Uri("file://"), path)
 
@@ -59,6 +52,18 @@ let blechRange2LSPRange (r: range) =
                                       // that is why we do NOT subtract 1 from EndColumn
 
 
+let getTCctxFromTUP (ctx: CompilationUnit.Context<ImportChecking.ModuleInfo>) tup =
+    let moduleInfo: ImportChecking.ModuleInfo =
+        match ctx.loaded.TryGetValue (CompilationUnit.Implementation tup) with
+        | true, Ok modInfoRes -> modInfoRes.info
+        | _, Error _ -> failwithf "Found implementation for %s but it is errornous." <| tup.ToString()
+        | false, _ ->
+            match ctx.loaded.TryGetValue (CompilationUnit.Interface tup) with
+            | true, Ok modInfoRes -> modInfoRes.info
+            | _, Error _ -> failwithf "Found interface for %s but it is errornous." <| tup.ToString()
+            | false, _ -> failwithf "Neither an implementation nor an interface exists for %s in the loaded context." <| tup.ToString()
+    moduleInfo.typeCheck
+                                      
 let internal packNewDiagnosticParameters (logger: Diagnostics.Logger) =
     let blechContextInfo2LSPRelatedInfo (ctxList: Diagnostics.ContextInformation list) =
         let uri (ctx: Diagnostics.ContextInformation) = 
@@ -112,7 +117,10 @@ let compile (uri: Uri) moduleName fileContents =
             |> Seq.map packNewDiagnosticParameters
             |> Seq.concat
         | Ok modinfo ->
-            updateCtx uri modinfo.typeCheck
+            // TODO 1: this could also be an interface
+            let compilationModule = CompilationUnit.Module<_>.Make moduleName inputFile modinfo
+            pkgCtx.loaded.Add(CompilationUnit.Implementation moduleName, compilationModule) // only imported Modules are added to the loaded dict automatically
+            updateCtx uri pkgCtx 
             Seq.empty
     
 
@@ -144,7 +152,8 @@ let findInfoForQName (tcContext: TypeCheckContext) (qname: QName) =
 
 
 // Find the range for the definition of an identifier
-let findDefinition (tcContext: TypeCheckContext) (qname: QName): (Uri * Range) =
+let findDefinition (ctx: CompilationUnit.Context<ImportChecking.ModuleInfo>) (qname: QName): (Uri * Range) =
+    let tcContext = getTCctxFromTUP ctx qname.moduleName
     let findDecl = findInfoForQName tcContext qname
     match findDecl with
     | Decl (Declarable.ParamDecl {pos=pos})
@@ -157,7 +166,8 @@ let findDefinition (tcContext: TypeCheckContext) (qname: QName): (Uri * Range) =
         pathToUri pos.FileName, blechRange2LSPRange pos
 
 
-let findHoverData (qname: QName) (tcContext: TypeCheckContext) uri : string = 
+let findHoverData (qname: QName) (ctx: CompilationUnit.Context<ImportChecking.ModuleInfo>) uri : string =
+    let tcContext = getTCctxFromTUP ctx qname.moduleName
     let printSubDecl (prot: ProcedurePrototype) = 
         // this is almost a copy of BlechTypes.ProcedurePrototype.ToDoc, just the name rendering is different
         let annotationDoc = prot.annotation.ToDoc
@@ -212,7 +222,7 @@ let findHoverData (qname: QName) (tcContext: TypeCheckContext) uri : string =
 // Converts a HashSet of source positions provided by the compiler (allReferences) and appends the declaration location to a list of locations for the LSP
 let convertBlechReferences (pos: range) (usagePositions: HashSet<range>) (uri: Uri): list<Types.Location> =
     let mkLocFromPos (p: range) =
-        { uri = uri
+        { uri = pathToUri p.FileName
           range = blechRange2LSPRange p }
     let locList = 
         usagePositions
@@ -223,7 +233,8 @@ let convertBlechReferences (pos: range) (usagePositions: HashSet<range>) (uri: U
 
 
 // Find a list of identifiers in the current uri using the QName and current Type Checking Context
-let findReferenceSources (qname: QName) (uri: Uri) (tcContext: TypeCheckContext) : list<Types.Location> = 
+let findReferenceSources (qname: QName) (uri: Uri) (ctx: CompilationUnit.Context<ImportChecking.ModuleInfo>) : list<Types.Location> = 
+    let tcContext = getTCctxFromTUP ctx qname.moduleName
     let declarable = findInfoForQName tcContext qname
     match declarable with
     | Decl (Declarable.ParamDecl {pos=pos; allReferences=allReferences})
