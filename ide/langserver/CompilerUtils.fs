@@ -183,8 +183,8 @@ let findHoverData (qname: QName) (ctx: CompilationUnit.Context<ImportChecking.Mo
         let ins = prot.inputs |> List.map printParam |> dpCommaSeparatedInParens
         let outs = prot.outputs|> List.map printParam |> dpCommaSeparatedInParens
         let spdoc = 
-            if prot.IsSingleton then txt "singleton" else empty
-            <+> prot.kind.ToDoc
+            if prot.IsSingleton then txt "singleton" <+> empty else empty
+            <^> prot.kind.ToDoc
             <+> txt (prot.name.basicId.ToString())
             <^> ( ins
                   <..> outs
