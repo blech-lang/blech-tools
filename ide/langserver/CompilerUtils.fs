@@ -176,7 +176,10 @@ let findHoverData (qname: QName) (ctx: CompilationUnit.Context<ImportChecking.Mo
     let tcContext = getTCctxFromTUP ctx qname.moduleName
     let printSubDecl (prot: ProcedurePrototype) = 
         // this is almost a copy of BlechTypes.ProcedurePrototype.ToDoc, just the name rendering is different
-        let annotationDoc = prot.annotation.ToDoc
+        let annotationDoc = 
+            match prot.annotation.ToDoc with
+            | [] -> empty
+            | lst -> dpToplevelClose lst <.> empty
         let returns = prot.returns
         let printParam (p: ParamDecl) =
             txt (p.name.basicId.ToString()) <^> txt ":" <+> p.datatype.ToDoc
@@ -191,7 +194,7 @@ let findHoverData (qname: QName) (ctx: CompilationUnit.Context<ImportChecking.Mo
                   <.> match returns with | ValueTypes.Void -> empty | _ -> txt "returns" <+> returns.ToDoc
                   |> align
                   |> group )
-        annotationDoc |> dpToplevelClose <.> spdoc
+        annotationDoc <^> spdoc
         |> render None
     let findHover = findInfoForQName tcContext qname
     match findHover with
