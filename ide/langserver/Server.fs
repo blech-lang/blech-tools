@@ -91,14 +91,53 @@ let hover (p: TextDocumentPositionParams) =
     lookUpAction p packHoverRes None
     
 let gotoDefinition (p: TextDocumentPositionParams) =
-    let packDefinitionRes _ _ ctx symbolQName =
-        let u, r = findDefinition ctx symbolQName
-        let declLocation: Location = {
-            uri = u
-            range = r
-        }
-        Some declLocation
-    lookUpAction p packDefinitionRes None
+    let negResAction = None
+
+    let uri = p.textDocument.uri
+    let symbol = getSymbol p
+    let name = lspSymbolToBlechName uri symbol
+    eprintfn "name: %s" name.idToString
+    match getCtx uri with
+    | Some ctx ->
+        let tcCtx = getTCctxFromUri ctx uri
+        try
+            let qname = name |> tcCtx.ncEnv.GetLookupTable.nameToQname
+            eprintfn "Qname: %A" qname
+            let tcCtx = getTCctxFromTUP ctx qname.moduleName
+            // we meed to search in the submodule's context using the qname because only that
+            // is globally unique. Searching with a name is not enough because the id alone
+            // is not unique and the range is pointing to the signature, not the implementation
+            let findDecl = findInfoForQName tcCtx qname
+            match findDecl with
+            | Decl (Declarable.ParamDecl {pos=pos})
+            | Decl (Declarable.VarDecl {pos=pos})
+            | Decl (Declarable.ProcedureImpl {pos=pos})
+            | Decl (Declarable.ProcedurePrototype {pos=pos}) 
+            | Decl (Declarable.ExternalVarDecl {pos=pos}) ->
+                Some {
+                    uri = pathToUri pos.FileName
+                    range = blechRange2LSPRange pos
+                }
+            | Usertype (pos,_) -> 
+                Some {
+                    uri = pathToUri pos.FileName
+                    range = blechRange2LSPRange pos
+                }
+        with
+        | _ ->
+            // for names that have no QName representation and thus cannot be found above
+            // for example local module identifiers, we resort to purely name based searching
+            // within the open file
+            try 
+                eprintfn "Cannot make Qname for %s or find any info for that" name.idToString
+                let declName = tcCtx.ncEnv.GetLookupTable.getDeclName name
+                Some <| blechNameToLspLocation declName
+            with
+            | _ -> 
+                // happens when GotoDefinition was invoked on some symbol which is a Blech name
+                eprintfn "Did not find name %s" <| name.ToString()
+                negResAction
+    | None -> negResAction
     
 let findReferences (p: ReferenceParams) =
     let packReferencesRes _ _ ctx symbolQName =

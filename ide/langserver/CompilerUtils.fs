@@ -38,7 +38,7 @@ open Types
 open DocumentStore
 
 
-let private pathToUri (path: string) =
+let pathToUri (path: string) =
     new Uri(new Uri("file://"), path)
 
 
@@ -52,6 +52,28 @@ let blechRange2LSPRange (r: range) =
                                       // that is why we do NOT subtract 1 from EndColumn
 
 
+let lspRangeToBlechRange (uri: Uri) (r: Range) =
+    let fileIndex = Range.fileIndexOfFile uri.LocalPath
+    Range.range ( fileIndex, 
+                  r.start.line + 1, 
+                  r.start.character + 1, 
+                  r.``end``.line + 1, 
+                  r.``end``.character + 1 ) // Blech ranges start at 1 and include the last char
+
+
+let lspSymbolToBlechName uri (s: Symbol) =
+    Blech.Frontend.SyntaxUtils.ParserUtils.ParserContext.mkFakeName 
+    <| s.identifier 
+    <| lspRangeToBlechRange uri s.range
+
+
+let blechNameToLspLocation (name: Name) =
+    {
+        uri = pathToUri name.Range.FileName
+        range = blechRange2LSPRange name.Range
+    }
+    
+
 let getTCctxFromTUP (ctx: CompilationUnit.Context<ImportChecking.ModuleInfo>) tup =
     let moduleInfo: ImportChecking.ModuleInfo =
         match ctx.loaded.TryGetValue (CompilationUnit.Implementation tup) with
@@ -64,12 +86,14 @@ let getTCctxFromTUP (ctx: CompilationUnit.Context<ImportChecking.ModuleInfo>) tu
             | false, _ -> failwithf "Neither an implementation nor an interface exists for %s in the loaded context." <| tup.ToString()
     moduleInfo.typeCheck
 
+
 let getTCctxFromUri (ctx: CompilationUnit.Context<ImportChecking.ModuleInfo>) uri =
     let tup = 
         getModule uri
         |> Option.get
     getTCctxFromTUP ctx tup
-                                      
+          
+          
 let internal packNewDiagnosticParameters (logger: Diagnostics.Logger) =
     let blechContextInfo2LSPRelatedInfo (ctxList: Diagnostics.ContextInformation list) =
         let uri (ctx: Diagnostics.ContextInformation) = 
@@ -102,7 +126,6 @@ let internal packNewDiagnosticParameters (logger: Diagnostics.Logger) =
     //|> Seq.groupBy (fun diag -> diag.main.range.FileName)
     |> Seq.map (fun diag -> pathToUri diag.main.range.FileName, [|blechDiag2LSPDiag diag|])
     
-
 
 let compile (uri: Uri) moduleName fileContents =
     let inputFile = uri.LocalPath
@@ -143,9 +166,11 @@ let findQName fileName (loc: Types.Location) (ident: Identifier) (lut: SymbolTab
     | e -> 
         None
 
+
 type DeclOrType =
     | Decl of Declarable
     | Usertype of range * BlechTypes.Types
+
 
 let findInfoForQName (tcContext: TypeCheckContext) (qname: QName) =
     if tcContext.nameToDecl.ContainsKey qname then
@@ -196,36 +221,39 @@ let findHoverData (qname: QName) (ctx: CompilationUnit.Context<ImportChecking.Mo
                   |> group )
         annotationDoc <^> spdoc
         |> render None
-    let findHover = findInfoForQName tcContext qname
-    match findHover with
-    | Decl (Declarable.ParamDecl param) ->
-        let perm = if param.isMutable then "var" else "let"
-        sprintf "%s %s: %s" perm param.name.basicId (param.datatype.ToString())
-    | Decl (Declarable.VarDecl var) -> 
-        match var.mutability with
-        | Mutability.Variable ->
-            sprintf "%s %s: %s" "var" var.name.basicId (var.datatype.ToString())
-        | Mutability.Immutable ->
-            sprintf "%s %s: %s" "let" var.name.basicId (var.datatype.ToString())
-        | Mutability.CompileTimeConstant ->
-            sprintf "%s %s: %s = %s" "const" var.name.basicId (var.datatype.ToString()) (var.initValue.ToString())
-        | Mutability.StaticParameter ->
-            sprintf "%s %s: %s = %s" "param" var.name.basicId (var.datatype.ToString()) (var.initValue.ToString())
-    | Decl (Declarable.ExternalVarDecl var) ->
-        match var.mutability with
-        | Mutability.Variable ->
-            sprintf "%s %s: %s" "var" var.name.basicId (var.datatype.ToString())
-        | Mutability.Immutable ->
-            sprintf "%s %s: %s" "let" var.name.basicId (var.datatype.ToString())
-        | Mutability.CompileTimeConstant ->
-            sprintf "%s %s: %s" "const" var.name.basicId (var.datatype.ToString())
-        | Mutability.StaticParameter ->
-            sprintf "%s %s: %s" "param" var.name.basicId (var.datatype.ToString())
-    | Decl (Declarable.ProcedureImpl sub) ->
-        printSubDecl sub.prototype 
-    | Decl (Declarable.ProcedurePrototype fp) ->
-        printSubDecl fp 
-    | Usertype (_,t) -> t.ToString()
+    try
+        let findHover = findInfoForQName tcContext qname
+        match findHover with
+        | Decl (Declarable.ParamDecl param) ->
+            let perm = if param.isMutable then "var" else "let"
+            sprintf "%s %s: %s" perm param.name.basicId (param.datatype.ToString())
+        | Decl (Declarable.VarDecl var) -> 
+            match var.mutability with
+            | Mutability.Variable ->
+                sprintf "%s %s: %s" "var" var.name.basicId (var.datatype.ToString())
+            | Mutability.Immutable ->
+                sprintf "%s %s: %s" "let" var.name.basicId (var.datatype.ToString())
+            | Mutability.CompileTimeConstant ->
+                sprintf "%s %s: %s = %s" "const" var.name.basicId (var.datatype.ToString()) (var.initValue.ToString())
+            | Mutability.StaticParameter ->
+                sprintf "%s %s: %s = %s" "param" var.name.basicId (var.datatype.ToString()) (var.initValue.ToString())
+        | Decl (Declarable.ExternalVarDecl var) ->
+            match var.mutability with
+            | Mutability.Variable ->
+                sprintf "%s %s: %s" "var" var.name.basicId (var.datatype.ToString())
+            | Mutability.Immutable ->
+                sprintf "%s %s: %s" "let" var.name.basicId (var.datatype.ToString())
+            | Mutability.CompileTimeConstant ->
+                sprintf "%s %s: %s" "const" var.name.basicId (var.datatype.ToString())
+            | Mutability.StaticParameter ->
+                sprintf "%s %s: %s" "param" var.name.basicId (var.datatype.ToString())
+        | Decl (Declarable.ProcedureImpl sub) ->
+            printSubDecl sub.prototype 
+        | Decl (Declarable.ProcedurePrototype fp) ->
+            printSubDecl fp 
+        | Usertype (_,t) -> t.ToString()
+    with
+    | _ -> ""
 
 
 // Converts a HashSet of source positions provided by the compiler (allReferences) and appends the declaration location to a list of locations for the LSP
