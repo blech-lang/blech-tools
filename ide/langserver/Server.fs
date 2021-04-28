@@ -89,20 +89,23 @@ let hover (p: TextDocumentPositionParams) =
         }
         Some hover
     lookUpAction p packHoverRes None
-    
+
+
+// if the symbol's declaration is in another module, it has been imported
+//   in that case open ctx of submodule Implementation and look up data there
+//   based on QNames
+// otherwise look up position info in this context based on Name
 let gotoDefinition (p: TextDocumentPositionParams) =
     let negResAction = None
 
     let uri = p.textDocument.uri
     let symbol = getSymbol p
     let name = lspSymbolToBlechName uri symbol
-    eprintfn "name: %s" name.idToString
     match getCtx uri with
     | Some ctx ->
         let tcCtx = getTCctxFromUri ctx uri
         try
             let qname = name |> tcCtx.ncEnv.GetLookupTable.nameToQname
-            eprintfn "Qname: %A" qname
             let tcCtx = getTCctxFromTUP ctx qname.moduleName
             // we meed to search in the submodule's context using the qname because only that
             // is globally unique. Searching with a name is not enough because the id alone
@@ -129,20 +132,62 @@ let gotoDefinition (p: TextDocumentPositionParams) =
             // for example local module identifiers, we resort to purely name based searching
             // within the open file
             try 
-                eprintfn "Cannot make Qname for %s or find any info for that" name.idToString
                 let declName = tcCtx.ncEnv.GetLookupTable.getDeclName name
                 Some <| blechNameToLspLocation declName
             with
             | _ -> 
                 // happens when GotoDefinition was invoked on some symbol which is a Blech name
-                eprintfn "Did not find name %s" <| name.ToString()
                 negResAction
     | None -> negResAction
     
 let findReferences (p: ReferenceParams) =
-    let packReferencesRes _ _ ctx symbolQName =
-        findReferenceSources symbolQName p.textDocument.uri ctx 
-    lookUpAction {textDocument = p.textDocument; position = p.position} packReferencesRes []
+    //let packReferencesRes _ _ ctx symbolQName =
+    //    findReferenceSources symbolQName p.textDocument.uri ctx 
+    //lookUpAction {textDocument = p.textDocument; position = p.position} packReferencesRes []
+    let negResAction = []
+    
+    let uri = p.textDocument.uri
+    let symbol = getSymbol {textDocument = p.textDocument; position = p.position}
+    let name = lspSymbolToBlechName uri symbol
+
+    match getCtx uri with
+    | Some ctx ->
+        let tup = 
+            getModule uri
+            |> Option.get
+        let tcCtx = getTCctxFromTUP ctx tup
+        try
+            let resPart1 =
+                tcCtx.ncEnv.GetLookupTable.AllUsages name
+                |> List.map blechNameToLspLocation
+            try
+                let qname = name |> tcCtx.ncEnv.GetLookupTable.nameToQname
+                let resPart2 =
+                    // only neccessary if moduleName is different from the open file's moduleName
+                    if qname.moduleName <> tup then
+                        let tcCtx = getTCctxFromTUP ctx qname.moduleName
+                        let declarable = findInfoForQName tcCtx qname
+                        match declarable with
+                        | Decl (Declarable.ParamDecl {pos=pos; allReferences=allReferences})
+                        | Decl (Declarable.VarDecl {pos=pos; allReferences=allReferences})
+                        | Decl (Declarable.ExternalVarDecl {pos=pos; allReferences=allReferences})
+                        | Decl (Declarable.ProcedureImpl {pos=pos; allReferences=allReferences})
+                        | Decl (Declarable.ProcedurePrototype {pos=pos; allReferences=allReferences}) ->
+                            convertBlechReferences pos allReferences uri
+                        | Usertype (pos,_) ->
+                            convertBlechReferences pos (System.Collections.Generic.HashSet<Range.range>()) uri
+                    else
+                        negResAction
+                resPart2 @ resPart1
+                |> List.distinct
+            with
+            | _ ->
+                resPart1
+        with
+        | _ -> 
+            // happens when findReferences was invoked on some symbol which is a Blech name
+            negResAction
+    | None -> negResAction
     
 
 type Server(publishDiagnostics) = 
