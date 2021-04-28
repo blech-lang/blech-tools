@@ -182,21 +182,6 @@ let findInfoForQName (tcContext: TypeCheckContext) (qname: QName) =
         |> failwith 
 
 
-// Find the range for the definition of an identifier
-let findDefinition (ctx: CompilationUnit.Context<ImportChecking.ModuleInfo>) (qname: QName): (Uri * Range) =
-    let tcContext = getTCctxFromTUP ctx qname.moduleName
-    let findDecl = findInfoForQName tcContext qname
-    match findDecl with
-    | Decl (Declarable.ParamDecl {pos=pos})
-    | Decl (Declarable.VarDecl {pos=pos})
-    | Decl (Declarable.ProcedureImpl {pos=pos})
-    | Decl (Declarable.ProcedurePrototype {pos=pos}) 
-    | Decl (Declarable.ExternalVarDecl {pos=pos}) ->
-        pathToUri pos.FileName, blechRange2LSPRange pos // packRange (pos.Start.Line, pos.Start.Column, pos.End.Line, pos.End.Column)
-    | Usertype (pos,_) -> 
-        pathToUri pos.FileName, blechRange2LSPRange pos
-
-
 let findHoverData (qname: QName) (ctx: CompilationUnit.Context<ImportChecking.ModuleInfo>) uri : string =
     let tcContext = getTCctxFromTUP ctx qname.moduleName
     let printSubDecl (prot: ProcedurePrototype) = 
@@ -257,7 +242,7 @@ let findHoverData (qname: QName) (ctx: CompilationUnit.Context<ImportChecking.Mo
 
 
 // Converts a HashSet of source positions provided by the compiler (allReferences) and appends the declaration location to a list of locations for the LSP
-let convertBlechReferences (pos: range) (usagePositions: HashSet<range>) (uri: Uri): list<Types.Location> =
+let convertBlechReferences (pos: range) (usagePositions: HashSet<range>): list<Types.Location> =
     let mkLocFromPos (p: range) =
         { uri = pathToUri p.FileName
           range = blechRange2LSPRange p }
@@ -269,18 +254,97 @@ let convertBlechReferences (pos: range) (usagePositions: HashSet<range>) (uri: U
     declLoc :: locList
 
 
-// Find a list of identifiers in the current uri using the QName and current Type Checking Context
-let findReferenceSources (qname: QName) (uri: Uri) (ctx: CompilationUnit.Context<ImportChecking.ModuleInfo>) : list<Types.Location> = 
-    //TODO: actually might need to use the context of the open file and not the one which declares the given qname
-    //let tcContext = getTCctxFromTUP ctx qname.moduleName
-    let tcContext = getTCctxFromUri ctx uri
-    let declarable = findInfoForQName tcContext qname
-    match declarable with
-    | Decl (Declarable.ParamDecl {pos=pos; allReferences=allReferences})
-    | Decl (Declarable.VarDecl {pos=pos; allReferences=allReferences})
-    | Decl (Declarable.ExternalVarDecl {pos=pos; allReferences=allReferences})
-    | Decl (Declarable.ProcedureImpl {pos=pos; allReferences=allReferences})
-    | Decl (Declarable.ProcedurePrototype {pos=pos; allReferences=allReferences}) ->
-        convertBlechReferences pos allReferences uri
-    | Usertype (pos,_) ->
-        convertBlechReferences pos (HashSet<range>()) uri
+let lookUpAction2 (p: TextDocumentPositionParams) action1 action2 combineResults negResAction =
+    let uri = p.textDocument.uri
+    let symbol = getSymbol p
+    let name = lspSymbolToBlechName uri symbol
+
+    match getCtx uri with
+    | Some ctx ->
+        let tup = getModule uri |> Option.get
+        let tcCtx = getTCctxFromTUP ctx tup
+        try
+            let resAction1 = action1 tcCtx name
+            try
+                let qname = name |> tcCtx.ncEnv.GetLookupTable.nameToQname
+                let resAction2 =
+                    // only neccessary if moduleName is different from the open file's moduleName
+                    if qname.moduleName <> tup then
+                        let tcCtx = getTCctxFromTUP ctx qname.moduleName
+                        action2 tcCtx qname
+                    else
+                        negResAction
+                combineResults resAction1 resAction2
+            with
+            | _ ->
+                resAction1
+        with
+        | _ -> 
+            // happens when invoked on some symbol which is not a Blech name
+            negResAction
+    | None -> 
+        // happens if no successful compilation run has taken place and no ctx was saved
+        negResAction
+
+
+let gotoDefinition (p: TextDocumentPositionParams) =
+    let negResAction = None
+    let action1 tcCtx name =
+        // look up definition based on names within open file
+        tcCtx.ncEnv.GetLookupTable.getDeclName name
+        |> blechNameToLspLocation
+        |> Some
+    let action2 tcCtx qname =
+        // look up definition in a submodule found by constucting the QName
+        let findDecl = findInfoForQName tcCtx qname
+        match findDecl with
+        | Decl (Declarable.ParamDecl {pos=pos})
+        | Decl (Declarable.VarDecl {pos=pos})
+        | Decl (Declarable.ProcedureImpl {pos=pos})
+        | Decl (Declarable.ProcedurePrototype {pos=pos}) 
+        | Decl (Declarable.ExternalVarDecl {pos=pos}) ->
+            Some {
+                uri = pathToUri pos.FileName
+                range = blechRange2LSPRange pos
+            }
+        | Usertype (pos,_) -> 
+            Some {
+                uri = pathToUri pos.FileName
+                range = blechRange2LSPRange pos
+            }
+    let combineResults _ res2 =
+        res2 // take definition found via QName in submodule 
+
+    lookUpAction2 
+    <| p
+    <| action1
+    <| action2 
+    <| combineResults 
+    <| negResAction
+
+    
+let findReferences (p: ReferenceParams) =
+    let negResAction = []
+    let action1 tcCtx name =
+        tcCtx.ncEnv.GetLookupTable.AllUsages name
+        |> List.map blechNameToLspLocation
+    let action2 tcCtx qname =
+        let declarable = findInfoForQName tcCtx qname
+        match declarable with
+        | Decl (Declarable.ParamDecl {pos=pos; allReferences=allReferences})
+        | Decl (Declarable.VarDecl {pos=pos; allReferences=allReferences})
+        | Decl (Declarable.ExternalVarDecl {pos=pos; allReferences=allReferences})
+        | Decl (Declarable.ProcedureImpl {pos=pos; allReferences=allReferences})
+        | Decl (Declarable.ProcedurePrototype {pos=pos; allReferences=allReferences}) ->
+            convertBlechReferences pos allReferences 
+        | Usertype (pos,_) ->
+            convertBlechReferences pos (System.Collections.Generic.HashSet<Range.range>()) 
+    let combineResults res1 res2 =
+        res2 @ res1 |> List.distinct
+
+    lookUpAction2 
+    <| {textDocument = p.textDocument; position = p.position} 
+    <| action1
+    <| action2 
+    <| combineResults 
+    <| negResAction
