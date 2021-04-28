@@ -281,19 +281,56 @@ let lookUpAction2 (p: TextDocumentPositionParams) action1 action2 combineResults
         with
         | _ -> 
             // happens when invoked on some symbol which is not a Blech name
-            negResAction
+
+            // could be the case that it is an import module path/
+            // assuming this, try to construct a translation unit path from that string/
+            // if successful, check it is among the imported modules
+            // if so, return position 0,0 in that file
+            match TranslationUnitPath.makeFromPath tup symbol.identifier with
+            | Error _ -> negResAction
+            | Ok potentialImportPath ->
+                let moduleInfo: ImportChecking.ModuleInfo =
+                    match ctx.loaded.TryGetValue (CompilationUnit.Implementation tup) with
+                    | true, Ok modInfoRes -> modInfoRes.info
+                    | _, Error _ -> failwithf "Found implementation for %s but it is errornous." <| tup.ToString()
+                    | false, _ ->
+                        match ctx.loaded.TryGetValue (CompilationUnit.Interface tup) with
+                        | true, Ok modInfoRes -> modInfoRes.info
+                        | _, Error _ -> failwithf "Found interface for %s but it is errornous." <| tup.ToString()
+                        | false, _ -> failwithf "Neither an implementation nor an interface exists for %s in the loaded context." <| tup.ToString()
+                moduleInfo.dependsOn 
+                |> List.contains potentialImportPath
+                |> function
+                    | false -> negResAction
+                    | true -> 
+                        let blcFile = TranslationUnitPath.searchImplementation ctx.projectDir potentialImportPath
+                        match blcFile with
+                        | Ok blc ->
+                            [{
+                                uri = pathToUri blc
+                                range = blechRange2LSPRange Range.range0
+                            }]
+                        | _ ->
+                            let blhFile = TranslationUnitPath.searchInterface ctx.blechPath potentialImportPath
+                            match blhFile with
+                            | Ok blh ->
+                                [{
+                                    uri = pathToUri blh
+                                    range = blechRange2LSPRange Range.range0
+                                }]
+                            | _ -> negResAction
     | None -> 
         // happens if no successful compilation run has taken place and no ctx was saved
         negResAction
 
 
 let gotoDefinition (p: TextDocumentPositionParams) =
-    let negResAction = None
+    let negResAction = []
     let action1 tcCtx name =
         // look up definition based on names within open file
         tcCtx.ncEnv.GetLookupTable.getDeclName name
         |> blechNameToLspLocation
-        |> Some
+        |> List.singleton
     let action2 tcCtx qname =
         // look up definition in a submodule found by constucting the QName
         let findDecl = findInfoForQName tcCtx qname
@@ -303,15 +340,15 @@ let gotoDefinition (p: TextDocumentPositionParams) =
         | Decl (Declarable.ProcedureImpl {pos=pos})
         | Decl (Declarable.ProcedurePrototype {pos=pos}) 
         | Decl (Declarable.ExternalVarDecl {pos=pos}) ->
-            Some {
+            [{
                 uri = pathToUri pos.FileName
                 range = blechRange2LSPRange pos
-            }
+            }]
         | Usertype (pos,_) -> 
-            Some {
+            [{
                 uri = pathToUri pos.FileName
                 range = blechRange2LSPRange pos
-            }
+            }]
     let combineResults res1 res2 =
         // prefer definition found via QName in submodule 
         if res2 = negResAction then res1 else res2

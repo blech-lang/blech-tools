@@ -127,6 +127,7 @@ type Server(publishDiagnostics) =
         member this.DidChangeWatchedFiles(p: DidChangeWatchedFilesParams): unit = () 
         member this.GotoDefinition(p: TextDocumentPositionParams): option<Types.Location> = 
             gotoDefinition p
+            |> List.tryHead
         member this.Hover(p: TextDocumentPositionParams): Hover option =
             hover p
         member this.FindReferences(p: ReferenceParams): list<Location> =
