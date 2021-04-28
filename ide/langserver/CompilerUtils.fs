@@ -312,8 +312,9 @@ let gotoDefinition (p: TextDocumentPositionParams) =
                 uri = pathToUri pos.FileName
                 range = blechRange2LSPRange pos
             }
-    let combineResults _ res2 =
-        res2 // take definition found via QName in submodule 
+    let combineResults res1 res2 =
+        // prefer definition found via QName in submodule 
+        if res2 = negResAction then res1 else res2
 
     lookUpAction2 
     <| p
