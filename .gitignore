@@ -220,3 +220,5 @@ out/
 node_modules/
 # build output
 *.vsix
+
+.fake
