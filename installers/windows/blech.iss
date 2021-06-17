@@ -4,7 +4,7 @@
 #endif
 
 #ifndef VERSION
-  #define VERSION  "0.6.1+0"
+  #define VERSION  "0.7.0+0"
 #endif
 
 
@@ -15,7 +15,7 @@ AppVerName=Blech {#VERSION}
 AppPublisher=Robert Bosch GmbH
 AppPublisherURL=http://blech-lang.org
 AppSupportURL=https://github.com/boschresearch/blech
-AppCopyright=Copyright (C) 2019-2020 see blech-lang.org
+AppCopyright=Copyright (C) 2019-2021 see blech-lang.org
 DisableWelcomePage = no
 DefaultDirName={userpf}\Blech
 DefaultGroupName=Blech
@@ -37,7 +37,7 @@ Name: "{app}\doc"
 Name: "{app}\include"
 
 [Files]
-Source: "{#BLECH_SOURCE}\bin\Release\netcoreapp3.1\win-x64\publish\*"; DestDir: "{app}\bin"; Flags: ignoreversion
+Source: "{#BLECH_SOURCE}\bin\Release\net5.0\win-x64\publish\*"; DestDir: "{app}\bin"; Flags: ignoreversion
 ;Source: "reference.html"; DestDir: "{app}\doc"
 Source: "{#BLECH_SOURCE}\include\*"; DestDir: "{app}\include"
 
