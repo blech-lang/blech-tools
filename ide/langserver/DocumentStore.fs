@@ -76,10 +76,13 @@ let private findRange(text: StringBuilder, range: Range): int * int =
                 char <- char + 1
     (startOffset, endOffset)
 
+/// Identifiers contain letters, digits or underscores
+let private isIdChar c =
+    c = '_' || Char.IsLetterOrDigit c
 
 let rec private seekBackwards text offset counter =
     if counter < offset then
-        if Char.IsLetterOrDigit (text.ToString().[offset - counter - 1]) then
+        if isIdChar (text.ToString().[offset - counter - 1]) then
             seekBackwards text offset (counter + 1)
         else
             counter
@@ -89,7 +92,7 @@ let rec private seekBackwards text offset counter =
 
 let rec private seekForward (text: StringBuilder) offset counter =
     if counter + offset < text.Length then
-        if Char.IsLetterOrDigit (text.ToString().[offset + counter]) then
+        if isIdChar (text.ToString().[offset + counter]) then
             seekForward text offset (counter + 1)
         else
             counter
