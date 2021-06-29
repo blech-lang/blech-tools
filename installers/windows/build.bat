@@ -33,10 +33,10 @@ set /p BUILD=<build.txt
 del build.txt
 popd
 
-set PATCH=1
+set PATCH=0
 
-set DOTNET_VERSION=0.6.%PATCH%.%BUILD%
-set SEMANTIC_VERSION=0.6.%PATCH%+%BUILD%
+set DOTNET_VERSION=0.7.%PATCH%.%BUILD%
+set SEMANTIC_VERSION=0.7.%PATCH%+%BUILD%
 
 
 rem build the blech compiler
