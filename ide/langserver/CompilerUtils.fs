@@ -32,26 +32,14 @@ open Blech.Common.PPrint
 open Blech.Frontend
 open Blech.Frontend.CommonTypes
 open Blech.Frontend.BlechTypes
-open Blech.Frontend.PrettyPrint.DocPrint
-open Blech.Intermediate
+open Blech.Frontend.DocPrint
 
 open Types
 open DocumentStore
 
 
-// Convert the URI from the client and to a file path that Blech compiler accepts
-let parseCompilerUri (uri: Uri): string = 
-    uri.AbsolutePath 
-    |> (fun s -> if s.StartsWith @"\" then s.Substring(1) else s)
-    //uri.AbsolutePath
-
-
 let pathToUri (path: string) =
     new Uri(new Uri("file://"), path)
-
-
-let packRange (lineStart: int, charStart: int, lineEnd: int, charEnd: int): Range = 
-    {start = {line=lineStart; character=charStart}; ``end``={line=lineEnd; character=charEnd}}
 
 
 let blechRange2LSPRange (r: range) = 
@@ -64,13 +52,53 @@ let blechRange2LSPRange (r: range) =
                                       // that is why we do NOT subtract 1 from EndColumn
 
 
-let packNewDiagnosticParameters (logger: Diagnostics.Logger): Diagnostic[] =
+let lspRangeToBlechRange (uri: Uri) (r: Range) =
+    let fileIndex = Range.fileIndexOfFile uri.LocalPath
+    Range.range ( fileIndex, 
+                  r.start.line + 1, 
+                  r.start.character + 1, 
+                  r.``end``.line + 1, 
+                  r.``end``.character + 1 ) // Blech ranges start at 1 and include the last char
+
+
+let lspSymbolToBlechName uri (s: Symbol) =
+    Blech.Frontend.SyntaxUtils.ParserUtils.ParserContext.mkFakeName 
+    <| s.identifier 
+    <| lspRangeToBlechRange uri s.range
+
+
+let blechNameToLspLocation (name: Name) =
+    {
+        uri = pathToUri name.Range.FileName
+        range = blechRange2LSPRange name.Range
+    }
+    
+
+let getTCctxFromTUP (ctx: CompilationUnit.Context<ImportChecking.ModuleInfo>) tup =
+    let moduleInfo: ImportChecking.ModuleInfo =
+        match ctx.loaded.TryGetValue (CompilationUnit.Implementation tup) with
+        | true, Ok modInfoRes -> modInfoRes.info
+        | _, Error _ -> failwithf "Found implementation for %s but it is errornous." <| tup.ToString()
+        | false, _ ->
+            match ctx.loaded.TryGetValue (CompilationUnit.Interface tup) with
+            | true, Ok modInfoRes -> modInfoRes.info
+            | _, Error _ -> failwithf "Found interface for %s but it is errornous." <| tup.ToString()
+            | false, _ -> failwithf "Neither an implementation nor an interface exists for %s in the loaded context." <| tup.ToString()
+    moduleInfo.typeCheck
+
+
+let getTCctxFromUri (ctx: CompilationUnit.Context<ImportChecking.ModuleInfo>) uri =
+    let tup = 
+        getModule uri
+        |> Option.get
+    getTCctxFromTUP ctx tup
+          
+          
+let internal packNewDiagnosticParameters (logger: Diagnostics.Logger) =
     let blechContextInfo2LSPRelatedInfo (ctxList: Diagnostics.ContextInformation list) =
         let uri (ctx: Diagnostics.ContextInformation) = 
             try pathToUri ctx.range.FileName
             with _ as e ->
-                eprintfn "%s" ctx.range.FileName
-                eprintfn "%s" e.StackTrace
                 Uri ""
         ctxList
         |> List.map (fun ctx -> {location = {uri = (uri ctx); range = blechRange2LSPRange ctx.range}; message = ctx.message})
@@ -87,15 +115,7 @@ let packNewDiagnosticParameters (logger: Diagnostics.Logger): Diagnostic[] =
             | Diagnostics.Level.Note -> DiagnosticSeverity.Information
             | Diagnostics.Level.Help -> DiagnosticSeverity.Hint
         let sourceMessage =
-            match diag.phase with
-            | Diagnostics.Phase.Default
-            | Diagnostics.Phase.Compiling -> SourceKind.Compile
-            | Diagnostics.Phase.Parsing -> SourceKind.Parse
-            | Diagnostics.Phase.Naming -> SourceKind.Name
-            | Diagnostics.Phase.Typing -> SourceKind.Type
-            | Diagnostics.Phase.Causality -> SourceKind.Causality
-            | Diagnostics.Phase.CodeGeneration -> SourceKind.Code
-            |> writeSourceKind
+            diag.phase.ToString()
         { range = mainRange
           severity = severity.ToString()
           code = None
@@ -103,53 +123,54 @@ let packNewDiagnosticParameters (logger: Diagnostics.Logger): Diagnostic[] =
           message = diag.main.message 
           relatedInformation = blechContextInfo2LSPRelatedInfo diag.context}
     Diagnostics.Emitter.getDiagnostics logger
-    |> Seq.map blechDiag2LSPDiag
-    |> Array.ofSeq
-
-
-let buildASTPackage fileName moduleName fileContents =
-    let logger = Diagnostics.Logger.create ()
-    ParsePkg.parseModuleFromStrNoConsole logger fileName moduleName fileContents
-
-
-let buildNCContext moduleName pack =
-    let diagnosticLogger = Diagnostics.Logger.create ()
-    let ncCtx = NameChecking.initialise diagnosticLogger moduleName
-    // create dummy pkgContext to satisfy the API
-    let pkgContext = Package.Context.Make Arguments.BlechCOptions.Default diagnosticLogger (Blech.Compiler.Main.loader Arguments.BlechCOptions.Default diagnosticLogger)
-    NameChecking.checkDeclaredness pkgContext ncCtx pack
+    //|> Seq.groupBy (fun diag -> diag.main.range.FileName)
+    |> Seq.map (fun diag -> pathToUri diag.main.range.FileName, [|blechDiag2LSPDiag diag|])
     
 
 let compile (uri: Uri) moduleName fileContents =
-    let fileName = uri.AbsolutePath
-    let ctx = 
-        buildASTPackage fileName moduleName fileContents
-        |> Result.bind (buildNCContext moduleName)
-        |> Result.bind (TypeChecking.typeCheck Arguments.BlechCOptions.Default)
-    ctx
-    |> Result.bind Causality.checkPackCausality
+    let inputFile = uri.LocalPath
+    let projectDir = System.IO.Path.GetDirectoryName inputFile
+    let outDir = System.IO.Path.Combine(projectDir, "blech")
+    let cliArgs = {Arguments.BlechCOptions.Default with isDryRun = true; projectDir = projectDir; outDir = outDir}
+    let logger = Diagnostics.Logger.create()   
+    
+    let noImportChain = CompilationUnit.ImportChain.Empty
+    
+    let pkgCtx = CompilationUnit.Context.Make cliArgs (loader cliArgs)
+    compileFromStr cliArgs pkgCtx logger noImportChain moduleName inputFile fileContents
     |> function
-        | Error logger -> packNewDiagnosticParameters logger
-        | Ok _ ->
-            match ctx with 
-            | Ok (ctx, _) -> // always passes
-                updateCtx uri ctx
-            | _ -> () // never happens
-            [||]
+        | Error logger -> 
+            let errImps = List.map snd pkgCtx.GetErrorImports
+            let loggers = logger :: errImps
+            loggers
+            |> Seq.map packNewDiagnosticParameters
+            |> Seq.concat
+        | Ok modinfo ->
+            // TODO 1: this could also be an interface
+            let compilationModule = CompilationUnit.Module<_>.Make moduleName inputFile modinfo
+            pkgCtx.loaded.Add(CompilationUnit.Implementation moduleName, compilationModule) // only imported Modules are added to the loaded dict automatically
+            updateCtx uri pkgCtx 
+            Seq.empty
     
 
 let findQName fileName (loc: Types.Location) (ident: Identifier) (lut: SymbolTable.LookupTable): QName option =
     try
         let fileIndex = Range.fileIndexOfFile fileName
         let identPos = Range.range (fileIndex, loc.range.start.line + 1, loc.range.start.character + 1, loc.range.``end``.line + 1, loc.range.``end``.character + 1)
-        Some <| lut.nameToQname { Name.id = ident; range = identPos }
+        let name =
+            Blech.Frontend.SyntaxUtils.ParserUtils.ParserContext.mkFakeName ident identPos
+        name
+        |> lut.nameToQname
+        |> Some
     with
-    | _ -> 
+    | e -> 
         None
+
 
 type DeclOrType =
     | Decl of Declarable
-    | Usertype of BlechTypes.Types
+    | Usertype of range * BlechTypes.Types
+
 
 let findInfoForQName (tcContext: TypeCheckContext) (qname: QName) =
     if tcContext.nameToDecl.ContainsKey qname then
@@ -161,79 +182,70 @@ let findInfoForQName (tcContext: TypeCheckContext) (qname: QName) =
         |> failwith 
 
 
-// Find the range for the declaration of an identifier
-let findDeclaration (tcContext: TypeCheckContext) (qname: QName): Range =
-    let findDecl = findInfoForQName tcContext qname
-    match findDecl with
-    | Decl (Declarable.ParamDecl {pos=pos})
-    | Decl (Declarable.VarDecl {pos=pos})
-    | Decl (Declarable.SubProgramDecl {pos=pos})
-    | Decl (Declarable.FunctionPrototype {pos=pos}) 
-    | Decl (Declarable.ExternalVarDecl {pos=pos}) ->
-        packRange (pos.Start.Line, pos.Start.Column, pos.End.Line, pos.End.Column)
-    | Usertype t -> 
-        t.TryRange
-        |> function
-           | Some pos -> packRange (pos.Start.Line, pos.Start.Column, pos.End.Line, pos.End.Column)
-           | None ->
-            sprintf "%s is a named type but has no position information.\n" (qname.ToString())
-            |> failwith 
-
-
-let findHoverData (qname: QName) (tcContext: TypeCheckContext) uri : string = 
-    let printSubDecl annotationDoc (inputs: ParamDecl list) (outputs: ParamDecl list) (name: QName) returns isFunction isPrototype =
+let findHoverData (qname: QName) (ctx: CompilationUnit.Context<ImportChecking.ModuleInfo>) uri : string =
+    let tcContext = getTCctxFromTUP ctx qname.moduleName
+    let printSubDecl (prot: ProcedurePrototype) = 
+        // this is almost a copy of BlechTypes.ProcedurePrototype.ToDoc, just the name rendering is different
+        let annotationDoc = 
+            match prot.annotation.ToDoc with
+            | [] -> empty
+            | lst -> dpToplevelClose lst <.> empty
+        let returns = prot.returns
         let printParam (p: ParamDecl) =
             txt (p.name.basicId.ToString()) <^> txt ":" <+> p.datatype.ToDoc
-        let ins = inputs |> List.map printParam |> dpCommaSeparatedInParens
-        let outs = outputs|> List.map printParam |> dpCommaSeparatedInParens
+        let ins = prot.inputs |> List.map printParam |> dpCommaSeparatedInParens
+        let outs = prot.outputs|> List.map printParam |> dpCommaSeparatedInParens
         let spdoc = 
-            if isPrototype then txt "extern function"
-            else
-                if isFunction then txt "function" else txt "activity"
-            <+> txt (name.basicId.ToString())
+            if prot.IsSingleton then txt "singleton" <+> empty else empty
+            <^> prot.kind.ToDoc
+            <+> txt (prot.name.basicId.ToString())
             <^> ( ins
                   <..> outs
                   <.> match returns with | ValueTypes.Void -> empty | _ -> txt "returns" <+> returns.ToDoc
                   |> align
                   |> group )
-        annotationDoc |> dpToplevelClose <.> spdoc
+        annotationDoc <^> spdoc
         |> render None
-    let findHover = findInfoForQName tcContext qname
-    match findHover with
-    | Decl (Declarable.ParamDecl param) ->
-        let perm = if param.isMutable then "var" else "let"
-        sprintf "%s %s: %s" perm param.name.basicId (param.datatype.ToString())
-    | Decl (Declarable.VarDecl var) -> 
-        match var.mutability with
-        | Mutability.Variable ->
-            sprintf "%s %s: %s" "var" var.name.basicId (var.datatype.ToString())
-        | Mutability.Immutable ->
-            sprintf "%s %s: %s" "let" var.name.basicId (var.datatype.ToString())
-        | Mutability.CompileTimeConstant ->
-            sprintf "%s %s: %s = %s" "const" var.name.basicId (var.datatype.ToString()) (var.initValue.ToString())
-        | Mutability.StaticParameter ->
-            sprintf "%s %s: %s = %s" "param" var.name.basicId (var.datatype.ToString()) (var.initValue.ToString())
-    | Decl (Declarable.ExternalVarDecl var) ->
-        match var.mutability with
-        | Mutability.Variable ->
-            sprintf "%s %s: %s" "var" var.name.basicId (var.datatype.ToString())
-        | Mutability.Immutable ->
-            sprintf "%s %s: %s" "let" var.name.basicId (var.datatype.ToString())
-        | Mutability.CompileTimeConstant ->
-            sprintf "%s %s: %s" "const" var.name.basicId (var.datatype.ToString())
-        | Mutability.StaticParameter ->
-            sprintf "%s %s: %s" "param" var.name.basicId (var.datatype.ToString())
-    | Decl (Declarable.SubProgramDecl sub) ->
-        printSubDecl sub.annotation.ToDoc sub.inputs sub.outputs sub.name sub.returns sub.isFunction false
-    | Decl (Declarable.FunctionPrototype fp) ->
-        printSubDecl fp.annotation.ToDoc fp.inputs fp.outputs fp.name fp.returns fp.isFunction true
-    | Usertype t -> t.ToString()
+    try
+        let findHover = findInfoForQName tcContext qname
+        match findHover with
+        | Decl (Declarable.ParamDecl param) ->
+            let perm = if param.isMutable then "var" else "let"
+            sprintf "%s %s: %s" perm param.name.basicId (param.datatype.ToString())
+        | Decl (Declarable.VarDecl var) -> 
+            match var.mutability with
+            | Mutability.Variable ->
+                sprintf "%s %s: %s" "var" var.name.basicId (var.datatype.ToString())
+            | Mutability.Immutable ->
+                sprintf "%s %s: %s" "let" var.name.basicId (var.datatype.ToString())
+            | Mutability.CompileTimeConstant ->
+                sprintf "%s %s: %s = %s" "const" var.name.basicId (var.datatype.ToString()) (var.initValue.ToString())
+            | Mutability.StaticParameter ->
+                sprintf "%s %s: %s = %s" "param" var.name.basicId (var.datatype.ToString()) (var.initValue.ToString())
+        | Decl (Declarable.ExternalVarDecl var) ->
+            match var.mutability with
+            | Mutability.Variable ->
+                sprintf "%s %s: %s" "var" var.name.basicId (var.datatype.ToString())
+            | Mutability.Immutable ->
+                sprintf "%s %s: %s" "let" var.name.basicId (var.datatype.ToString())
+            | Mutability.CompileTimeConstant ->
+                sprintf "%s %s: %s" "const" var.name.basicId (var.datatype.ToString())
+            | Mutability.StaticParameter ->
+                sprintf "%s %s: %s" "param" var.name.basicId (var.datatype.ToString())
+        | Decl (Declarable.ProcedureImpl sub) ->
+            printSubDecl sub.prototype 
+        | Decl (Declarable.ProcedurePrototype fp) ->
+            printSubDecl fp 
+        | Usertype (_,t) -> t.ToString()
+    with
+    | _ -> ""
 
 
 // Converts a HashSet of source positions provided by the compiler (allReferences) and appends the declaration location to a list of locations for the LSP
-let convertBlechReferences (pos: range) (usagePositions: HashSet<range>) (uri: Uri): list<Types.Location> =
+let convertBlechReferences (pos: range) (usagePositions: HashSet<range>): list<Types.Location> =
     let mkLocFromPos (p: range) =
-        { range=packRange(p.Start.Line-1, p.Start.Column-1, p.End.Line-1, p.End.Column); uri=uri }
+        { uri = pathToUri p.FileName
+          range = blechRange2LSPRange p }
     let locList = 
         usagePositions
         |> Seq.map mkLocFromPos
@@ -242,20 +254,135 @@ let convertBlechReferences (pos: range) (usagePositions: HashSet<range>) (uri: U
     declLoc :: locList
 
 
-// Find a list of identifiers in the current uri using the QName and current Type Checking Context
-let findReferenceSources (qname: QName) (uri: Uri) (tcContext: TypeCheckContext) : list<Types.Location> = 
-    let declarable = findInfoForQName tcContext qname
-    match declarable with
-    | Decl (Declarable.ParamDecl {pos=pos; allReferences=allReferences})
-    | Decl (Declarable.VarDecl {pos=pos; allReferences=allReferences})
-    | Decl (Declarable.ExternalVarDecl {pos=pos; allReferences=allReferences})
-    | Decl (Declarable.SubProgramDecl {pos=pos; allReferences=allReferences})
-    | Decl (Declarable.FunctionPrototype {pos=pos; allReferences=allReferences}) ->
-        convertBlechReferences pos allReferences uri
-    | Usertype t ->
-        t.TryRange
-        |> function
-           | Some pos -> convertBlechReferences pos (HashSet<range>()) uri
-           | None ->
-            sprintf "%s is a named type but has no position information.\n" (qname.ToString())
-            |> failwith
+let lookUpAction2 (p: TextDocumentPositionParams) action1 action2 combineResults negResAction =
+    let uri = p.textDocument.uri
+    let symbol = getSymbol p
+    let name = lspSymbolToBlechName uri symbol
+
+    match getCtx uri with
+    | Some ctx ->
+        let tup = getModule uri |> Option.get
+        let tcCtx = getTCctxFromTUP ctx tup
+        try
+            let resAction1 = action1 tcCtx name
+            try
+                let qname = name |> tcCtx.ncEnv.GetLookupTable.nameToQname
+                let resAction2 =
+                    // only neccessary if moduleName is different from the open file's moduleName
+                    if qname.moduleName <> tup then
+                        let tcCtx = getTCctxFromTUP ctx qname.moduleName
+                        action2 tcCtx qname
+                    else
+                        negResAction
+                combineResults resAction1 resAction2
+            with
+            | _ ->
+                resAction1
+        with
+        | _ -> 
+            // happens when invoked on some symbol which is not a Blech name
+
+            // could be the case that it is an import module path/
+            // assuming this, try to construct a translation unit path from that string/
+            // if successful, check it is among the imported modules
+            // if so, return position 0,0 in that file
+            match TranslationUnitPath.makeFromPath tup symbol.identifier with
+            | Error _ -> negResAction
+            | Ok potentialImportPath ->
+                let moduleInfo: ImportChecking.ModuleInfo =
+                    match ctx.loaded.TryGetValue (CompilationUnit.Implementation tup) with
+                    | true, Ok modInfoRes -> modInfoRes.info
+                    | _, Error _ -> failwithf "Found implementation for %s but it is errornous." <| tup.ToString()
+                    | false, _ ->
+                        match ctx.loaded.TryGetValue (CompilationUnit.Interface tup) with
+                        | true, Ok modInfoRes -> modInfoRes.info
+                        | _, Error _ -> failwithf "Found interface for %s but it is errornous." <| tup.ToString()
+                        | false, _ -> failwithf "Neither an implementation nor an interface exists for %s in the loaded context." <| tup.ToString()
+                moduleInfo.dependsOn 
+                |> List.contains potentialImportPath
+                |> function
+                    | false -> negResAction
+                    | true -> 
+                        let blcFile = TranslationUnitPath.searchImplementation ctx.projectDir potentialImportPath
+                        match blcFile with
+                        | Ok blc ->
+                            [{
+                                uri = pathToUri blc
+                                range = blechRange2LSPRange Range.range0
+                            }]
+                        | _ ->
+                            let blhFile = TranslationUnitPath.searchInterface ctx.blechPath potentialImportPath
+                            match blhFile with
+                            | Ok blh ->
+                                [{
+                                    uri = pathToUri blh
+                                    range = blechRange2LSPRange Range.range0
+                                }]
+                            | _ -> negResAction
+    | None -> 
+        // happens if no successful compilation run has taken place and no ctx was saved
+        negResAction
+
+
+let gotoDefinition (p: TextDocumentPositionParams) =
+    let negResAction = []
+    let action1 tcCtx name =
+        // look up definition based on names within open file
+        tcCtx.ncEnv.GetLookupTable.getDeclName name
+        |> blechNameToLspLocation
+        |> List.singleton
+    let action2 tcCtx qname =
+        // look up definition in a submodule found by constucting the QName
+        let findDecl = findInfoForQName tcCtx qname
+        match findDecl with
+        | Decl (Declarable.ParamDecl {pos=pos})
+        | Decl (Declarable.VarDecl {pos=pos})
+        | Decl (Declarable.ProcedureImpl {pos=pos})
+        | Decl (Declarable.ProcedurePrototype {pos=pos}) 
+        | Decl (Declarable.ExternalVarDecl {pos=pos}) ->
+            [{
+                uri = pathToUri pos.FileName
+                range = blechRange2LSPRange pos
+            }]
+        | Usertype (pos,_) -> 
+            [{
+                uri = pathToUri pos.FileName
+                range = blechRange2LSPRange pos
+            }]
+    let combineResults res1 res2 =
+        // prefer definition found via QName in submodule 
+        if res2 = negResAction then res1 else res2
+
+    lookUpAction2 
+    <| p
+    <| action1
+    <| action2 
+    <| combineResults 
+    <| negResAction
+
+    
+let findReferences (p: ReferenceParams) =
+    let negResAction = []
+    let action1 tcCtx name =
+        tcCtx.ncEnv.GetLookupTable.AllUsages name
+        |> List.map blechNameToLspLocation
+    let action2 tcCtx qname =
+        let declarable = findInfoForQName tcCtx qname
+        match declarable with
+        | Decl (Declarable.ParamDecl {pos=pos; allReferences=allReferences})
+        | Decl (Declarable.VarDecl {pos=pos; allReferences=allReferences})
+        | Decl (Declarable.ExternalVarDecl {pos=pos; allReferences=allReferences})
+        | Decl (Declarable.ProcedureImpl {pos=pos; allReferences=allReferences})
+        | Decl (Declarable.ProcedurePrototype {pos=pos; allReferences=allReferences}) ->
+            convertBlechReferences pos allReferences 
+        | Usertype (pos,_) ->
+            convertBlechReferences pos (System.Collections.Generic.HashSet<Range.range>()) 
+    let combineResults res1 res2 =
+        res2 @ res1 |> List.distinct
+
+    lookUpAction2 
+    <| {textDocument = p.textDocument; position = p.position} 
+    <| action1
+    <| action2 
+    <| combineResults 
+    <| negResAction

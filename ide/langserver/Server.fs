@@ -25,6 +25,7 @@ open System
 open System.IO
 open System.Text
 
+open Blech.Common
 open Blech.Frontend
 
 open CompilerUtils
@@ -33,23 +34,65 @@ open Serializers
 open Types
 
 
-type Server(publishDiagnostics) = 
-    do resetDocumentStore () // for good measure
-
-    let notFound (doc: Uri): 'Any = 
-        raise (Exception (sprintf "%s does not exist" (doc.ToString())))
-    // Compile current uri and publish any existing errors
-    let validateTextDocument (uri: Uri) = 
+let notFound (doc: Uri): 'Any = 
+    raise (Exception (sprintf "%s does not exist" (doc.ToString())))
+// Compile current uri and publish any existing errors
+let validateTextDocument publishDiagnostics (uri: Uri) = 
+    // check file name
+    let uriSegments = uri.Segments
+    let fileName = uriSegments.[uriSegments.Length-1] // without path to file
+    let fileExt = TranslationUnitPath.implementationFileExtension.ToCharArray()
+    let prefix = fileName.TrimEnd(fileExt)
+    let fileNameDiagnostics = 
+        if TranslationUnitPath.PathRegex.isValidFileOrDirectoryName prefix then
+            seq{uri, [||]}
+        else
+            let lgr = Diagnostics.Logger.create()
+            Diagnostics.Logger.logFatalError 
+            <| lgr
+            <| Diagnostics.Phase.Compiling
+            <| CompilationUnit.IllegalModuleFileName (fileName, [fileName])
+            packNewDiagnosticParameters lgr
+    // check file contents
+    let fileContentsDiagnostics =
         match getModule uri, getText uri with
         | Some modName, Some text ->
-            let diagnostics = compile uri modName text
-            publishDiagnostics (uri,diagnostics)
+            compile uri modName text                
         | _ -> notFound uri
+    Seq.concat [fileNameDiagnostics; fileContentsDiagnostics]
+    |> Seq.iter (fun (u, da) -> publishDiagnostics (u, da))
 
-    let tryPacking uri loc symbol packingFun defaultReturn =
-        match getCtx uri with
-        | Some tyCtx -> packingFun loc symbol tyCtx
-        | None -> defaultReturn
+
+let findQName (uri: Uri) (symbol: Symbol) tcContext =
+    let fileName = uri.LocalPath
+    let loc = { uri = uri              // Location of the symbol that 
+                range = symbol.range } // command was called on
+    findQName fileName loc symbol.identifier tcContext.ncEnv.GetLookupTable
+
+let lookUpAction (p: TextDocumentPositionParams) posResAction negResAction =
+    let uri = p.textDocument.uri
+    let symbol = getSymbol p
+    match getCtx uri with
+    | Some ctx ->
+        let tcCtx = getTCctxFromUri ctx uri
+        match findQName uri symbol tcCtx with
+        | Some symbolQName ->
+            posResAction uri symbol ctx symbolQName
+        | None -> negResAction
+    | None -> negResAction
+
+let hover (p: TextDocumentPositionParams) =
+    let packHoverRes uri (symbol: Symbol) ctx symbolQName =
+        let hover: Hover = {
+            contents = {language = "blech"; value = findHoverData symbolQName ctx uri}
+            range = symbol.range
+        }
+        Some hover
+    lookUpAction p packHoverRes None
+
+
+type Server(publishDiagnostics) = 
+    do resetDocumentStore () // for good measure
 
     interface ILanguageServer with 
         member this.Initialize(p: InitializeParams): InitializeResult = 
@@ -71,72 +114,26 @@ type Server(publishDiagnostics) =
         member this.DidChangeConfiguration(p: DidChangeConfigurationParams): unit = ()
         member this.DidOpenTextDocument(p: DidOpenTextDocumentParams): unit = 
             onOpen p.textDocument
-            validateTextDocument (p.textDocument.uri)
+            validateTextDocument publishDiagnostics p.textDocument.uri
         member this.DidChangeTextDocument(p: DidChangeTextDocumentParams): unit =
             onChange p
         member this.WillSaveTextDocument(p: WillSaveTextDocumentParams): unit = ()
         member this.DidSaveTextDocument(p: DidSaveTextDocumentParams): unit = 
-            validateTextDocument (p.textDocument.uri)
+            validateTextDocument publishDiagnostics p.textDocument.uri
         member this.DidCloseTextDocument(p: DidCloseTextDocumentParams): unit = 
             onClose p.textDocument.uri
             // Clear the errors for the document that was closed
             publishDiagnostics (p.textDocument.uri, [||])
         member this.DidChangeWatchedFiles(p: DidChangeWatchedFilesParams): unit = () 
         member this.GotoDefinition(p: TextDocumentPositionParams): option<Types.Location> = 
-            let packDeclLocation (initialLoc: Location) (s: Symbol) (tcContext: TypeCheckContext): option<Location> =
-                match findQName p.textDocument.uri.AbsolutePath initialLoc s.identifier tcContext.ncEnv with
-                | Some symbolQName ->
-                    let r = findDeclaration tcContext symbolQName
-                    let declLocation: Location = {
-                        uri = p.textDocument.uri
-                        range = packRange (r.start.line-1, r.start.character-1, r.``end``.line-1, r.``end``.character-1)
-                    }
-                    Some declLocation
-                | None -> None
-
-            let symbol = getSymbol p
-            //eprintf "%A\n" symbol
-            let initialLoc: Location = {
-                uri = p.textDocument.uri
-                range = symbol.range
-            }
-            tryPacking p.textDocument.uri initialLoc symbol packDeclLocation None
-
-        member this.Hover(p: TextDocumentPositionParams): option<Hover> =
-            let packHover (hoverLoc: Location) (s: Symbol) (tcContext: TypeCheckContext): option<Hover> = 
-                match findQName p.textDocument.uri.AbsolutePath hoverLoc s.identifier tcContext.ncEnv with
-                | Some symbolQName ->
-                    let hover: Hover = {
-                        contents = {language = "blech"; value = findHoverData symbolQName tcContext p.textDocument.uri}
-                        range = (packRange (s.range.start.line-1, s.range.start.character-1, s.range.``end``.line-1, s.range.``end``.character))
-                    }
-                    Some hover
-                | None -> None
-
-            let symbol = getSymbol p
-            // Location of the symbol that Hover command was called on
-            let hoverLoc = {
-                uri = p.textDocument.uri
-                range = symbol.range
-            }
-            tryPacking p.textDocument.uri hoverLoc symbol packHover None 
-
+            gotoDefinition p
+            |> List.tryHead
+        member this.Hover(p: TextDocumentPositionParams): Hover option =
+            hover p
         member this.FindReferences(p: ReferenceParams): list<Location> =
-            let packPositions (refLoc: Location) (s: Symbol) (tcContext: TypeCheckContext): list<Location> = 
-                match findQName p.textDocument.uri.AbsolutePath refLoc s.identifier tcContext.ncEnv with
-                | Some symbolQName ->
-                    findReferenceSources symbolQName p.textDocument.uri tcContext
-                | None -> []
-
-            let symbol = getSymbol { textDocument = p.textDocument; position = p.position }
-            // Location of the symbol that FindReferences command was called on
-            let refLoc = {
-                uri = p.textDocument.uri
-                range = symbol.range
-            }
-            tryPacking p.textDocument.uri refLoc symbol packPositions [] 
+            findReferences p
+            
         
-
 // Provide the protocol appropriate header text, and converts message being written to client to UTF8
 let private writeClient (client: BinaryWriter) (messageText: string) =
     let messageBytes = Encoding.UTF8.GetBytes messageText

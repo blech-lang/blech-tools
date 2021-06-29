@@ -44,7 +44,8 @@ open System.IO
 open System.Text
 open System.Text.RegularExpressions
 
-open Blech.Common.SearchPath
+open Blech.Common
+open Blech.Common.TranslationUnitPath
 open Blech.Frontend
 
 open Types
@@ -75,10 +76,13 @@ let private findRange(text: StringBuilder, range: Range): int * int =
                 char <- char + 1
     (startOffset, endOffset)
 
+/// Identifiers contain letters, digits or underscores
+let private isIdChar c =
+    c = '_' || Char.IsLetterOrDigit c
 
 let rec private seekBackwards text offset counter =
     if counter < offset then
-        if Char.IsLetterOrDigit (text.ToString().[offset - counter - 1]) then
+        if isIdChar (text.ToString().[offset - counter - 1]) then
             seekBackwards text offset (counter + 1)
         else
             counter
@@ -88,7 +92,7 @@ let rec private seekBackwards text offset counter =
 
 let rec private seekForward (text: StringBuilder) offset counter =
     if counter + offset < text.Length then
-        if Char.IsLetterOrDigit (text.ToString().[offset + counter]) then
+        if isIdChar (text.ToString().[offset + counter]) then
             seekForward text offset (counter + 1)
         else
             counter
@@ -102,9 +106,9 @@ let rec private seekForward (text: StringBuilder) offset counter =
 // mind the possible inconsistency between the document text and the attached typecheck context (which is older),
 // looking up of symbols will fail for modified lines, handle that case!
 type private Version = {
-    moduleName: ModuleName
+    moduleName: TranslationUnitPath
     text: StringBuilder
-    mutable ctx: TypeCheckContext option
+    mutable ctx: CompilationUnit.Context<ImportChecking.ModuleInfo> option
     mutable version: int
 }
 
@@ -171,8 +175,12 @@ let onClose (uri: Uri): unit =
 let onOpen (doc: TextDocumentItem): unit = 
     let text = StringBuilder(doc.text)
     let modName = 
-        let modulePlusSuffix = System.IO.Path.GetFileName(doc.uri.LocalPath)
-        [modulePlusSuffix.[..modulePlusSuffix.Length - 5]] // strip of ".blc"
+        let modulePlusSuffix = doc.uri.LocalPath
+        let srcDir = System.IO.Path.GetDirectoryName modulePlusSuffix
+        tryMakeTranslationUnitPath modulePlusSuffix srcDir None
+        |> function
+            | Ok x -> x
+            | _ -> failwith "Design opening of files properly"
     let version = {moduleName = modName; text = text; ctx = None; version = doc.version}
     activeDocuments.[doc.uri] <- version // this special syntax means:
                                                // if key not there, create it
@@ -187,7 +195,7 @@ let getCtx (uri: Uri) = activeDocuments.[uri].ctx
 
 
 /// Given a URI return its contents and version
-let tryGet file : option<ModuleName * string * int> = 
+let tryGet file : option<TranslationUnitPath * string * int> = 
     let found, value = activeDocuments.TryGetValue(file)
     if found then Some(value.moduleName, value.text.ToString(), value.version) else None 
 
@@ -209,7 +217,7 @@ let getVersion uri =
     |> Option.map (fun(_,_,v)->v)
 
 
-/// Given a URI return its version
+/// Given a URI return its translation unit path
 let getModule uri =
     tryGet uri
     |> Option.map (fun(m,_,_)->m)
@@ -221,7 +229,6 @@ let getSymbol (p: TextDocumentPositionParams) =
     let existing = activeDocuments.[p.textDocument.uri].text
     let r = { start = p.position; ``end`` = p.position }
     let offset, _ = findRange (existing, r)
-    //eprintf "offset: %d\n" offset
     let symbolStart = seekBackwards existing offset 0
     let symbolEnd = 
         let sE = seekForward existing offset 0
