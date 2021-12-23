@@ -1,6 +1,9 @@
-# Blech Tools
+# Blech Tool
+
+[![Project Status: Active – The project has reached a stable, usable state and is being actively developed.](https://www.repostatus.org/badges/latest/active.svg)](https://www.repostatus.org/#active)
 
 This repository comprises tools in the context of the Blech language and compiler (See: http://blech-lang.org)
+
 Currently, the following tools are available:
 * `ide/` - Integrated Development Environment plugin
 
