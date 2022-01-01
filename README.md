@@ -13,7 +13,7 @@ This repository contains the source of the Blech compiler as its submodule.
 
 Therefore clone with
 ```
-git clone --recurse-submodules https://github.com/boschresearch/blech-tools.git
+git clone --recurse-submodules https://github.com/blech-lang/blech-tools.git
 ```
 
 In order to update the Blech compilers sources, go into the subfolder ```./blech```. 
