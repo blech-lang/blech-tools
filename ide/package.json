@@ -85,7 +85,7 @@
     "activationEvents": [
         "onLanguage:blech"
     ],
-    "main": "./out/client/extension",
+    "main": "./out/client/extension.js",
     "scripts": {
         "vscode:prepublish": "npm run compile",
         "compile": "tsc -p ./",
