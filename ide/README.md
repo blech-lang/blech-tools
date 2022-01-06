@@ -6,7 +6,7 @@ Install Visual Studio Code (a.k.a. VSCode) either from https://code.visualstudio
 ### Prerequisites
 * Clone the blech-tools repository, including the blech compiler submodule
   ```
-  git clone --recurse-submodules https://github.com/boschresearch/blech-tools.git
+  git clone --recurse-submodules https://github.com/blech-lang/blech-tools.git
   ```
 * Install `npm` (which of course requires Node.js)
 * Change to `ide` subdirectory.
@@ -19,9 +19,11 @@ Install Visual Studio Code (a.k.a. VSCode) either from https://code.visualstudio
 
 * Build the actual language server using dotnet:
   ```
-  dotnet publish -c Release -o bin -r win-x64
+  dotnet publish -c Release -r win-x64 --self-contained false
   ```
-  Choose your runtime above [as necessary](https://docs.microsoft.com/de-de/dotnet/core/rid-catalog) (`linux-x64`, `linux-arm64`, `osx-x64`).
+
+  Choose your runtime above [as necessary](https://docs.microsoft.com/de-de/dotnet/core/rid-catalog).
+  For Linux use linux-x64 or linux-arm64, for MacOS use osx-x64 for Intel or osx-arm64 for Apple silicon. 
 
 * Build and package the plugin 
   ``` 
