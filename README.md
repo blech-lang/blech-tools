@@ -21,6 +21,7 @@ Update the ```blech``` submodule.
 
 ```
 cd blech
+git checkout main
 git pull
 ```
 

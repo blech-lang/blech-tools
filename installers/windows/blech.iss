@@ -37,7 +37,7 @@ Name: "{app}\doc"
 Name: "{app}\include"
 
 [Files]
-Source: "{#BLECH_SOURCE}\bin\Release\net5.0\win-x64\publish\*"; DestDir: "{app}\bin"; Flags: ignoreversion
+Source: "{#BLECH_SOURCE}\bin\Release\net6.0\win-x64\publish\*"; DestDir: "{app}\bin"; Flags: ignoreversion
 ;Source: "reference.html"; DestDir: "{app}\doc"
 Source: "{#BLECH_SOURCE}\include\*"; DestDir: "{app}\include"
 
