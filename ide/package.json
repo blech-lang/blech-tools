@@ -16,7 +16,7 @@
     "icon": "images/blechlogo.png",
     "repository": {
         "type": "git",
-        "url": "https://github.com/boschresearch/blech-tools"
+        "url": "https://github.com/blech-lang/blech-tools"
     },
     "contributes": {
         "languages": [

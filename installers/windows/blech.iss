@@ -12,10 +12,10 @@
 AppName=Blech Compiler
 AppVersion={#VERSION}
 AppVerName=Blech {#VERSION}
-AppPublisher=Robert Bosch GmbH
+AppPublisher=blech-lang.org
 AppPublisherURL=http://blech-lang.org
-AppSupportURL=https://github.com/boschresearch/blech
-AppCopyright=Copyright (C) 2019-2021 see blech-lang.org
+AppSupportURL=https://github.com/blech-lang/blech
+AppCopyright=Copyright (C) 2019-2022 see blech-lang.org
 DisableWelcomePage = no
 DefaultDirName={userpf}\Blech
 DefaultGroupName=Blech
@@ -47,7 +47,7 @@ Source: "{#BLECH_SOURCE}\include\*"; DestDir: "{app}\include"
 [Icons]
 
 ;Name: "{group}\Reference Manual"; Filename: "{app}\doc\reference.html"
-Name: "{group}\Source Code"; Filename: "https://github.com/boschresearch/blech"
+Name: "{group}\Source Code"; Filename: "https://github.com/blech-lang/blech"
 Name: "{group}\Uninstall Blech"; Filename: "{uninstallexe}"
 
 [Tasks]

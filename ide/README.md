@@ -19,7 +19,7 @@ Install Visual Studio Code (a.k.a. VSCode) either from https://code.visualstudio
 
 * Build the actual language server using dotnet:
   ```
-  dotnet publish -c Release -r win-x64 --self-contained false
+  dotnet publish -c Release -r win-x64 -o bin --self-contained false
   ```
 
   Choose your runtime above [as necessary](https://docs.microsoft.com/de-de/dotnet/core/rid-catalog).
