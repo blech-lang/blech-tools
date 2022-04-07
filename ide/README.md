@@ -18,11 +18,13 @@ Install Visual Studio Code (a.k.a. VSCode) either from https://code.visualstudio
 ### Build the language services plugin
 
 * Build the actual language server using
+  
+  ```
   dotnet publish -c Release -r win-x64 -o bin --self-contained
   ```
 
   Choose your runtime above [as necessary](https://docs.microsoft.com/de-de/dotnet/core/rid-catalog).
-  For Linux use linux-x64 or linux-arm64, for MacOS use osx-x64 for Intel or osx-arm64 for Apple silicon. 
+  For Linux use `linux-x64` or `linux-arm64`, for MacOS use `osx-x64` for Intel or `osx-arm64` for Apple silicon. 
 
 * Build and package the plugin 
   ``` 
