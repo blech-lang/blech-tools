@@ -8,6 +8,7 @@
     <!-- Self-contained deployment runtime roll forward (otherwise VS Code might complain about NETSDK1061) -->
     <TargetLatestRuntimePatch>true</TargetLatestRuntimePatch>
     <AssemblyName>BlechLanguageServer</AssemblyName>
+
   </PropertyGroup>
 
   <ItemGroup>
@@ -26,16 +27,16 @@
     <ValidateExecutableReferencesMatchSelfContained>false</ValidateExecutableReferencesMatchSelfContained>
   </PropertyGroup>
 
-   <ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\..\blech\src\blechc\blechc.fsproj" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="FSharp.Data" Version="4.1.1" />
+    <PackageReference Include="FSharp.Data" Version="4.2.8" />
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Update="FSharp.Core" Version="6.0.1" />
+    <PackageReference Update="FSharp.Core" Version="6.0.3" />
   </ItemGroup>
 
   <!-- 
