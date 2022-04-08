@@ -20,8 +20,11 @@ Install Visual Studio Code (a.k.a. VSCode) either from https://code.visualstudio
 * Build the actual language server using
   
   ```
-  dotnet publish -c Release -r win-x64 -o bin --self-contained
+  dotnet publish -c Release -r win-x64 -o bin --self-contained -p:ShouldUnsetParentConfigurationAndPlatform=false
   ```
+  
+  The property `-p:ShouldUnsetParentConfigurationAndPlatform=false` makes sure that the Blech compiler referenced by the language server is also build in configuration `Release` instead of `Debug`. 
+  Otherwise [CLI builds referenced libraries as debug for release build](https://github.com/dotnet/sdk/issues/9240#issuecomment-392894202).
 
   Choose your runtime above [as necessary](https://docs.microsoft.com/de-de/dotnet/core/rid-catalog).
   For Linux use `linux-x64` or `linux-arm64`, for MacOS use `osx-x64` for Intel or `osx-arm64` for Apple silicon. 
