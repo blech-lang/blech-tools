@@ -29,6 +29,8 @@ Install Visual Studio Code (a.k.a. VSCode) either from https://code.visualstudio
   Choose your runtime above [as necessary](https://docs.microsoft.com/de-de/dotnet/core/rid-catalog).
   For Linux use `linux-x64` or `linux-arm64`, for MacOS use `osx-x64` for Intel or `osx-arm64` for Apple silicon. 
 
+  For MacOS you might need to enable the execution of binaries from the terminal. Goto Security & Privacy -> Developer Tools and allow Terminal.app to execute binaries.
+
 * Build and package the plugin 
   ``` 
   vsce package
