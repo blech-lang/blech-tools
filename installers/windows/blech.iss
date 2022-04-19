@@ -4,7 +4,7 @@
 #endif
 
 #ifndef VERSION
-  #define VERSION  "0.7.0+0"
+  #define VERSION  "0.7.2+0"
 #endif
 
 
@@ -25,9 +25,7 @@ OutputDir="."
 OutputBaseFilename=Blech-{#VERSION}-setup
 PrivilegesRequired=lowest
 ChangesEnvironment=true
-#ifdef LOGO
-WizardImageFile=bosch.bmp
-#endif
+WizardImageFile=Blech.bmp
 WizardImageStretch=no
 ;WizardImageBackColor=clWhite
 
@@ -38,7 +36,6 @@ Name: "{app}\include"
 
 [Files]
 Source: "{#BLECH_SOURCE}\bin\Release\net6.0\win-x64\publish\*"; DestDir: "{app}\bin"; Flags: ignoreversion
-;Source: "reference.html"; DestDir: "{app}\doc"
 Source: "{#BLECH_SOURCE}\include\*"; DestDir: "{app}\include"
 
 [InstallDelete]
@@ -46,7 +43,7 @@ Source: "{#BLECH_SOURCE}\include\*"; DestDir: "{app}\include"
 
 [Icons]
 
-;Name: "{group}\Reference Manual"; Filename: "{app}\doc\reference.html"
+Name: "{group}\Documentation"; Filename: "https://www.blech-lang.org/docs"
 Name: "{group}\Source Code"; Filename: "https://github.com/blech-lang/blech"
 Name: "{group}\Uninstall Blech"; Filename: "{uninstallexe}"
 

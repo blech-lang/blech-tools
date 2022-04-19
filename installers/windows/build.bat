@@ -33,7 +33,7 @@ set /p BUILD=<build.txt
 del build.txt
 popd
 
-set PATCH=0
+set PATCH=2
 
 set DOTNET_VERSION=0.7.%PATCH%.%BUILD%
 set SEMANTIC_VERSION=0.7.%PATCH%+%BUILD%
@@ -44,6 +44,7 @@ dotnet publish /p:VERSION=%DOTNET_VERSION% ^
     --runtime win-x64 ^
     --configuration Release ^
     --verbosity normal ^
+    --self-contained ^
         %BLECH_SOURCE%\blechc.fsproj
 
 
